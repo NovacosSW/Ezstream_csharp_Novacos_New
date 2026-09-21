@@ -1,0 +1,21 @@
+{
+  "documentRoot": "C:\\ezstream\\data",
+  "segmentMinutes": 10,
+  "disuseTermDays": 60,
+  "logRetentionDays": 60,
+  "ffmpegLogLevel": "warning",
+  "udpNotificationIp": "127.0.0.1",
+  "udpNotificationPort": 0,
+  "sources": [
+    {
+      "url": "rtsp://210.99.70.120:1935/live/cctv001.stream",
+      "path": "stream1",
+      "filePrefix": "stream1"
+    },
+    {
+      "url": "rtsp://210.99.70.120:1935/live/cctv002.stream",
+      "path": "stream2",
+      "filePrefix": "stream2"
+    }
+  ]
+}

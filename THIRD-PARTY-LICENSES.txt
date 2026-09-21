@@ -1,0 +1,17 @@
+EzStream Recorder — 제3자 구성요소 고지
+
+1) FFmpeg (https://ffmpeg.org)
+   본 제품은 FFmpeg 4.4 공유 라이브러리(avformat/avcodec/avutil/swscale/swresample/
+   avfilter/avdevice)를 동적 링크(P/Invoke)하여 사용합니다.
+   FFmpeg는 LGPL v2.1+ 로 제공되며, 빌드 구성에 따라 GPL 구성요소가 포함될 수 있습니다.
+   배포하는 FFmpeg 빌드의 정확한 라이선스와 소스 취득 방법은 사용한 빌드 제공처
+   (예: https://www.gyan.dev/ffmpeg/builds/ , https://github.com/BtbN/FFmpeg-Builds )
+   의 고지를 따르십시오. GPL 빌드를 재배포하는 경우 GPL 의무(소스 제공 등)를 준수해야 합니다.
+
+2) FFmpeg.AutoGen (https://github.com/Ruslan-B/FFmpeg.AutoGen)
+   FFmpeg C API 에 대한 C# 바인딩. LGPL-3.0.
+
+3) .NET Runtime / Microsoft.Extensions.* (https://github.com/dotnet)
+   MIT License.
+
+각 라이선스 전문은 해당 프로젝트의 배포물에 포함된 원문을 참조하십시오.

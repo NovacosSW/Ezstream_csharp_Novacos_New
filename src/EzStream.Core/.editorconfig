@@ -1,0 +1,773 @@
+# 상위 디렉터리에서 .editorconfig 설정을 상속하려면 아래 행을 제거하세요.
+root = true
+
+# C# 파일
+[*.cs]
+
+#### 코어 EditorConfig 옵션 ####
+
+# 들여쓰기 및 간격
+indent_size = 4
+indent_style = space
+tab_width = 4
+
+# 새 줄 기본 설정
+end_of_line = crlf
+insert_final_newline = true
+
+#### .NET 코드 작업 ####
+
+# 멤버 입력
+dotnet_hide_advanced_members = true
+dotnet_member_insertion_location = with_other_members_of_the_same_kind
+dotnet_property_generation_behavior = prefer_throwing_properties
+
+# 기호 검색
+dotnet_search_reference_assemblies = true
+
+#### .NET 코딩 규칙 ####
+
+# Using 구성
+dotnet_separate_import_directive_groups = true
+dotnet_sort_system_directives_first = true
+file_header_template = unset
+
+# this. 및 Me. 기본 설정
+dotnet_style_qualification_for_event = true
+dotnet_style_qualification_for_field = true
+dotnet_style_qualification_for_method = true
+dotnet_style_qualification_for_property = true
+
+# 언어 키워드 및 BCL 형식 기본 설정
+dotnet_style_predefined_type_for_locals_parameters_members = true
+dotnet_style_predefined_type_for_member_access = true
+
+# 괄호 기본 설정
+dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity
+dotnet_style_parentheses_in_other_operators = never_if_unnecessary
+dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity
+
+# 한정자 기본 설정
+dotnet_style_require_accessibility_modifiers = for_non_interface_members
+
+# 식 수준 기본 설정
+dotnet_prefer_system_hash_code = true
+dotnet_style_coalesce_expression = true
+dotnet_style_collection_initializer = true
+dotnet_style_explicit_tuple_names = true
+dotnet_style_namespace_match_folder = true
+dotnet_style_null_propagation = true
+dotnet_style_object_initializer = true
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+dotnet_style_prefer_auto_properties = true
+dotnet_style_prefer_collection_expression = when_types_loosely_match
+dotnet_style_prefer_compound_assignment = true
+dotnet_style_prefer_conditional_expression_over_assignment = true
+dotnet_style_prefer_conditional_expression_over_return = true
+dotnet_style_prefer_foreach_explicit_cast_in_source = when_strongly_typed
+dotnet_style_prefer_inferred_anonymous_type_member_names = true
+dotnet_style_prefer_inferred_tuple_names = true
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true
+dotnet_style_prefer_simplified_boolean_expressions = true
+dotnet_style_prefer_simplified_interpolation = true
+
+# 필드 기본 설정
+dotnet_style_readonly_field = true
+
+# 매개 변수 기본 설정
+dotnet_code_quality_unused_parameters = all
+
+# 비표시 오류(Suppression) 기본 설정
+dotnet_remove_unnecessary_suppression_exclusions = none
+
+# 새 줄 기본 설정
+dotnet_style_allow_multiple_blank_lines_experimental = true
+dotnet_style_allow_statement_immediately_after_block_experimental = true
+
+#### C# 코딩 규칙 ####
+
+# var 기본 설정
+csharp_style_var_elsewhere = true:silent
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+
+# 식 본문 멤버
+csharp_style_expression_bodied_accessors = true:silent
+csharp_style_expression_bodied_constructors = true:silent
+csharp_style_expression_bodied_indexers = true:silent
+csharp_style_expression_bodied_lambdas = true
+csharp_style_expression_bodied_local_functions = true
+csharp_style_expression_bodied_methods = true:silent
+csharp_style_expression_bodied_operators = true:silent
+csharp_style_expression_bodied_properties = true:silent
+
+# 패턴 일치 기본 설정
+csharp_style_pattern_matching_over_as_with_null_check = true
+csharp_style_pattern_matching_over_is_with_cast_check = true
+csharp_style_prefer_extended_property_pattern = true
+csharp_style_prefer_not_pattern = true
+csharp_style_prefer_pattern_matching = true
+csharp_style_prefer_switch_expression = true
+
+# Null 검사 기본 설정
+csharp_style_conditional_delegate_call = true:suggestion
+
+# 한정자 기본 설정
+csharp_prefer_static_anonymous_function = true
+csharp_prefer_static_local_function = true
+csharp_preferred_modifier_order = public,private,protected,internal,file,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,required,volatile,async
+csharp_style_prefer_readonly_struct = true
+csharp_style_prefer_readonly_struct_member = true
+
+# 코드 블록 기본 설정
+csharp_prefer_braces = true
+csharp_prefer_simple_using_statement = true
+csharp_prefer_system_threading_lock = true
+csharp_style_namespace_declarations = block_scoped
+csharp_style_prefer_method_group_conversion = true
+csharp_style_prefer_primary_constructors = true
+csharp_style_prefer_top_level_statements = true
+
+# 식 수준 기본 설정
+csharp_prefer_simple_default_expression = true
+csharp_style_deconstructed_variable_declaration = true
+csharp_style_implicit_object_creation_when_type_is_apparent = true
+csharp_style_inlined_variable_declaration = true
+csharp_style_prefer_implicitly_typed_lambda_expression = true
+csharp_style_prefer_index_operator = true
+csharp_style_prefer_local_over_anonymous_function = true
+csharp_style_prefer_null_check_over_type_check = true
+csharp_style_prefer_range_operator = true
+csharp_style_prefer_tuple_swap = true
+csharp_style_prefer_unbound_generic_type_in_nameof = true
+csharp_style_prefer_utf8_string_literals = true
+csharp_style_throw_expression = true
+csharp_style_unused_value_assignment_preference = discard_variable
+csharp_style_unused_value_expression_statement_preference = discard_variable
+
+# 'using' 지시문 기본 설정
+csharp_using_directive_placement = outside_namespace:silent
+
+# 새 줄 기본 설정
+csharp_style_allow_blank_line_after_colon_in_constructor_initializer_experimental = true:silent
+csharp_style_allow_blank_line_after_token_in_arrow_expression_clause_experimental = true:silent
+csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental = true:silent
+csharp_style_allow_blank_lines_between_consecutive_braces_experimental = true:silent
+csharp_style_allow_embedded_statements_on_same_line_experimental = true:silent
+
+#### C# 서식 설정 규칙 ####
+
+# 새 줄 기본 설정
+csharp_new_line_before_catch = true
+csharp_new_line_before_else = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_open_brace = all
+csharp_new_line_between_query_expression_clauses = true
+
+# 들여쓰기 기본 설정
+csharp_indent_block_contents = true
+csharp_indent_braces = true
+csharp_indent_case_contents = true
+csharp_indent_case_contents_when_block = true
+csharp_indent_labels = one_less_than_current
+csharp_indent_switch_labels = true
+
+# 공간 기본 설정
+csharp_space_after_cast = true
+csharp_space_after_colon_in_inheritance_clause = true
+csharp_space_after_comma = true
+csharp_space_after_dot = true
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_after_semicolon_in_for_statement = true
+csharp_space_around_binary_operators = before_and_after
+csharp_space_around_declaration_statements = ignore
+csharp_space_before_colon_in_inheritance_clause = true
+csharp_space_before_comma = true
+csharp_space_before_dot = true
+csharp_space_before_open_square_brackets = true
+csharp_space_before_semicolon_in_for_statement = true
+csharp_space_between_empty_square_brackets = true
+csharp_space_between_method_call_empty_parameter_list_parentheses = true
+csharp_space_between_method_call_name_and_opening_parenthesis = true
+csharp_space_between_method_call_parameter_list_parentheses = true
+csharp_space_between_method_declaration_empty_parameter_list_parentheses = true
+csharp_space_between_method_declaration_name_and_open_parenthesis = true
+csharp_space_between_method_declaration_parameter_list_parentheses = true
+csharp_space_between_parentheses = expressions,type_casts,control_flow_statements
+csharp_space_between_square_brackets = true
+
+# 기본 설정 래핑
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = true
+
+#### 명명 스타일 ####
+
+# 명명 규칙
+
+dotnet_naming_rule.interface_should_be_begins_with_i.severity = suggestion
+dotnet_naming_rule.interface_should_be_begins_with_i.symbols = interface
+dotnet_naming_rule.interface_should_be_begins_with_i.style = begins_with_i
+
+dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
+
+dotnet_naming_rule.non_field_members_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.non_field_members_should_be_pascal_case.symbols = non_field_members
+dotnet_naming_rule.non_field_members_should_be_pascal_case.style = pascal_case
+
+# 기호 사양
+
+dotnet_naming_symbols.interface.applicable_kinds = interface
+dotnet_naming_symbols.interface.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.interface.required_modifiers = 
+
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum
+dotnet_naming_symbols.types.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.types.required_modifiers = 
+
+dotnet_naming_symbols.non_field_members.applicable_kinds = property, event, method
+dotnet_naming_symbols.non_field_members.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.non_field_members.required_modifiers = 
+
+# 명명 스타일
+
+dotnet_naming_style.pascal_case.required_prefix = 
+dotnet_naming_style.pascal_case.required_suffix = 
+dotnet_naming_style.pascal_case.word_separator = 
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.begins_with_i.required_prefix = I
+dotnet_naming_style.begins_with_i.required_suffix = 
+dotnet_naming_style.begins_with_i.word_separator = 
+dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+#### Microsoft.CodeAnalysis.NetAnalyzers 전체 규칙 설정 ####
+# 목적: CWE-660 매핑 여부와 관계없이 모든 NetAnalyzers 범주를 Warning으로 활성화
+dotnet_analyzer_diagnostic.category-Design.severity = warning
+dotnet_analyzer_diagnostic.category-Documentation.severity = warning
+dotnet_analyzer_diagnostic.category-Globalization.severity = warning
+dotnet_analyzer_diagnostic.category-Interoperability.severity = warning
+dotnet_analyzer_diagnostic.category-Maintainability.severity = warning
+dotnet_analyzer_diagnostic.category-Naming.severity = warning
+dotnet_analyzer_diagnostic.category-Performance.severity = warning
+dotnet_analyzer_diagnostic.category-Reliability.severity = warning
+dotnet_analyzer_diagnostic.category-Security.severity = warning
+dotnet_analyzer_diagnostic.category-Usage.severity = warning
+
+# Microsoft.CodeAnalysis.NetAnalyzers 10.0.301 제공 규칙 전체 명시
+# 검토자가 적용 규칙을 .editorconfig에서 직접 확인할 수 있도록 개별 규칙도 Warning으로 선언
+dotnet_diagnostic.CA1000.severity = warning
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA1002.severity = warning
+dotnet_diagnostic.CA1003.severity = warning
+dotnet_diagnostic.CA1005.severity = warning
+dotnet_diagnostic.CA1008.severity = warning
+dotnet_diagnostic.CA1009.severity = warning
+dotnet_diagnostic.CA1010.severity = warning
+dotnet_diagnostic.CA1012.severity = warning
+dotnet_diagnostic.CA1014.severity = warning
+dotnet_diagnostic.CA1016.severity = warning
+dotnet_diagnostic.CA1017.severity = warning
+dotnet_diagnostic.CA1018.severity = warning
+dotnet_diagnostic.CA1019.severity = warning
+dotnet_diagnostic.CA1021.severity = warning
+dotnet_diagnostic.CA1024.severity = warning
+dotnet_diagnostic.CA1027.severity = warning
+dotnet_diagnostic.CA1028.severity = warning
+dotnet_diagnostic.CA1030.severity = warning
+dotnet_diagnostic.CA1031.severity = warning
+dotnet_diagnostic.CA1032.severity = warning
+dotnet_diagnostic.CA1033.severity = warning
+dotnet_diagnostic.CA1034.severity = warning
+dotnet_diagnostic.CA1036.severity = warning
+dotnet_diagnostic.CA1040.severity = warning
+dotnet_diagnostic.CA1041.severity = warning
+dotnet_diagnostic.CA1043.severity = warning
+dotnet_diagnostic.CA1044.severity = warning
+dotnet_diagnostic.CA1045.severity = warning
+dotnet_diagnostic.CA1046.severity = warning
+dotnet_diagnostic.CA1047.severity = warning
+dotnet_diagnostic.CA1050.severity = warning
+dotnet_diagnostic.CA1051.severity = warning
+dotnet_diagnostic.CA1052.severity = warning
+dotnet_diagnostic.CA1053.severity = warning
+dotnet_diagnostic.CA1054.severity = warning
+dotnet_diagnostic.CA1055.severity = warning
+dotnet_diagnostic.CA1056.severity = warning
+dotnet_diagnostic.CA1058.severity = warning
+dotnet_diagnostic.CA1060.severity = warning
+dotnet_diagnostic.CA1061.severity = warning
+dotnet_diagnostic.CA1062.severity = warning
+dotnet_diagnostic.CA1063.severity = warning
+dotnet_diagnostic.CA1064.severity = warning
+dotnet_diagnostic.CA1065.severity = warning
+dotnet_diagnostic.CA1066.severity = warning
+dotnet_diagnostic.CA1067.severity = warning
+dotnet_diagnostic.CA1068.severity = warning
+dotnet_diagnostic.CA1069.severity = warning
+dotnet_diagnostic.CA1070.severity = warning
+dotnet_diagnostic.CA1200.severity = warning
+dotnet_diagnostic.CA1301.severity = warning
+dotnet_diagnostic.CA1303.severity = warning
+dotnet_diagnostic.CA1304.severity = warning
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1306.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+dotnet_diagnostic.CA1308.severity = warning
+dotnet_diagnostic.CA1401.severity = warning
+dotnet_diagnostic.CA1414.severity = warning
+dotnet_diagnostic.CA1416.severity = warning
+dotnet_diagnostic.CA1417.severity = warning
+dotnet_diagnostic.CA1418.severity = warning
+dotnet_diagnostic.CA1419.severity = warning
+dotnet_diagnostic.CA1420.severity = warning
+dotnet_diagnostic.CA1421.severity = warning
+dotnet_diagnostic.CA1422.severity = warning
+dotnet_diagnostic.CA1500.severity = warning
+dotnet_diagnostic.CA1501.severity = warning
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1505.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
+dotnet_diagnostic.CA1507.severity = warning
+dotnet_diagnostic.CA1508.severity = warning
+dotnet_diagnostic.CA1509.severity = warning
+dotnet_diagnostic.CA1514.severity = warning
+dotnet_diagnostic.CA1516.severity = warning
+dotnet_diagnostic.CA1601.severity = warning
+dotnet_diagnostic.CA1700.severity = warning
+dotnet_diagnostic.CA1707.severity = warning
+dotnet_diagnostic.CA1708.severity = warning
+dotnet_diagnostic.CA1710.severity = warning
+dotnet_diagnostic.CA1711.severity = warning
+dotnet_diagnostic.CA1712.severity = warning
+dotnet_diagnostic.CA1713.severity = warning
+dotnet_diagnostic.CA1715.severity = warning
+dotnet_diagnostic.CA1716.severity = warning
+dotnet_diagnostic.CA1720.severity = warning
+dotnet_diagnostic.CA1721.severity = warning
+dotnet_diagnostic.CA1724.severity = warning
+dotnet_diagnostic.CA1725.severity = warning
+dotnet_diagnostic.CA1726.severity = warning
+dotnet_diagnostic.CA1727.severity = warning
+dotnet_diagnostic.CA1802.severity = warning
+dotnet_diagnostic.CA1805.severity = warning
+dotnet_diagnostic.CA1806.severity = warning
+dotnet_diagnostic.CA1810.severity = warning
+dotnet_diagnostic.CA1812.severity = warning
+dotnet_diagnostic.CA1813.severity = warning
+dotnet_diagnostic.CA1814.severity = warning
+dotnet_diagnostic.CA1815.severity = warning
+dotnet_diagnostic.CA1816.severity = warning
+dotnet_diagnostic.CA1819.severity = warning
+dotnet_diagnostic.CA1820.severity = warning
+dotnet_diagnostic.CA1821.severity = warning
+dotnet_diagnostic.CA1822.severity = warning
+dotnet_diagnostic.CA1823.severity = warning
+dotnet_diagnostic.CA1824.severity = warning
+dotnet_diagnostic.CA1825.severity = warning
+dotnet_diagnostic.CA1826.severity = warning
+dotnet_diagnostic.CA1827.severity = warning
+dotnet_diagnostic.CA1828.severity = warning
+dotnet_diagnostic.CA1829.severity = warning
+dotnet_diagnostic.CA1830.severity = warning
+dotnet_diagnostic.CA1831.severity = warning
+dotnet_diagnostic.CA1832.severity = warning
+dotnet_diagnostic.CA1833.severity = warning
+dotnet_diagnostic.CA1834.severity = warning
+dotnet_diagnostic.CA1835.severity = warning
+dotnet_diagnostic.CA1836.severity = warning
+dotnet_diagnostic.CA1837.severity = warning
+dotnet_diagnostic.CA1838.severity = warning
+dotnet_diagnostic.CA1839.severity = warning
+dotnet_diagnostic.CA1840.severity = warning
+dotnet_diagnostic.CA1841.severity = warning
+dotnet_diagnostic.CA1842.severity = warning
+dotnet_diagnostic.CA1843.severity = warning
+dotnet_diagnostic.CA1845.severity = warning
+dotnet_diagnostic.CA1846.severity = warning
+dotnet_diagnostic.CA1847.severity = warning
+dotnet_diagnostic.CA1848.severity = warning
+dotnet_diagnostic.CA1849.severity = warning
+dotnet_diagnostic.CA1850.severity = warning
+dotnet_diagnostic.CA1851.severity = warning
+dotnet_diagnostic.CA1852.severity = warning
+dotnet_diagnostic.CA1853.severity = warning
+dotnet_diagnostic.CA1855.severity = warning
+dotnet_diagnostic.CA1861.severity = warning
+dotnet_diagnostic.CA1862.severity = warning
+dotnet_diagnostic.CA1863.severity = warning
+dotnet_diagnostic.CA1865.severity = warning
+dotnet_diagnostic.CA1866.severity = warning
+dotnet_diagnostic.CA1867.severity = warning
+dotnet_diagnostic.CA1868.severity = warning
+dotnet_diagnostic.CA1870.severity = warning
+dotnet_diagnostic.CA1872.severity = warning
+dotnet_diagnostic.CA1873.severity = warning
+dotnet_diagnostic.CA1874.severity = warning
+dotnet_diagnostic.CA1875.severity = warning
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA2001.severity = warning
+dotnet_diagnostic.CA2002.severity = warning
+dotnet_diagnostic.CA2007.severity = warning
+dotnet_diagnostic.CA2008.severity = warning
+dotnet_diagnostic.CA2009.severity = warning
+dotnet_diagnostic.CA2011.severity = warning
+dotnet_diagnostic.CA2012.severity = warning
+dotnet_diagnostic.CA2013.severity = warning
+dotnet_diagnostic.CA2014.severity = warning
+dotnet_diagnostic.CA2015.severity = warning
+dotnet_diagnostic.CA2016.severity = warning
+dotnet_diagnostic.CA2017.severity = warning
+dotnet_diagnostic.CA2018.severity = warning
+dotnet_diagnostic.CA2019.severity = warning
+dotnet_diagnostic.CA2020.severity = warning
+dotnet_diagnostic.CA2021.severity = warning
+dotnet_diagnostic.CA2022.severity = warning
+dotnet_diagnostic.CA2023.severity = warning
+dotnet_diagnostic.CA2024.severity = warning
+dotnet_diagnostic.CA2025.severity = warning
+dotnet_diagnostic.CA2100.severity = warning
+dotnet_diagnostic.CA2101.severity = warning
+dotnet_diagnostic.CA2119.severity = warning
+dotnet_diagnostic.CA2200.severity = warning
+dotnet_diagnostic.CA2201.severity = warning
+dotnet_diagnostic.CA2205.severity = warning
+dotnet_diagnostic.CA2207.severity = warning
+dotnet_diagnostic.CA2208.severity = warning
+dotnet_diagnostic.CA2211.severity = warning
+dotnet_diagnostic.CA2212.severity = warning
+dotnet_diagnostic.CA2213.severity = warning
+dotnet_diagnostic.CA2214.severity = warning
+dotnet_diagnostic.CA2215.severity = warning
+dotnet_diagnostic.CA2216.severity = warning
+dotnet_diagnostic.CA2217.severity = warning
+dotnet_diagnostic.CA2218.severity = warning
+dotnet_diagnostic.CA2219.severity = warning
+dotnet_diagnostic.CA2224.severity = warning
+dotnet_diagnostic.CA2225.severity = warning
+dotnet_diagnostic.CA2226.severity = warning
+dotnet_diagnostic.CA2227.severity = warning
+dotnet_diagnostic.CA2231.severity = warning
+dotnet_diagnostic.CA2234.severity = warning
+dotnet_diagnostic.CA2235.severity = warning
+dotnet_diagnostic.CA2236.severity = warning
+dotnet_diagnostic.CA2237.severity = warning
+dotnet_diagnostic.CA2239.severity = warning
+dotnet_diagnostic.CA2241.severity = warning
+dotnet_diagnostic.CA2242.severity = warning
+dotnet_diagnostic.CA2243.severity = warning
+dotnet_diagnostic.CA2244.severity = warning
+dotnet_diagnostic.CA2245.severity = warning
+dotnet_diagnostic.CA2246.severity = warning
+dotnet_diagnostic.CA2247.severity = warning
+dotnet_diagnostic.CA2248.severity = warning
+dotnet_diagnostic.CA2249.severity = warning
+dotnet_diagnostic.CA2250.severity = warning
+dotnet_diagnostic.CA2251.severity = warning
+dotnet_diagnostic.CA2252.severity = warning
+dotnet_diagnostic.CA2253.severity = warning
+dotnet_diagnostic.CA2254.severity = warning
+dotnet_diagnostic.CA2255.severity = warning
+dotnet_diagnostic.CA2256.severity = warning
+dotnet_diagnostic.CA2257.severity = warning
+dotnet_diagnostic.CA2258.severity = warning
+dotnet_diagnostic.CA2259.severity = warning
+dotnet_diagnostic.CA2260.severity = warning
+dotnet_diagnostic.CA2261.severity = warning
+dotnet_diagnostic.CA2262.severity = warning
+dotnet_diagnostic.CA2263.severity = warning
+dotnet_diagnostic.CA2300.severity = warning
+dotnet_diagnostic.CA2301.severity = warning
+dotnet_diagnostic.CA2302.severity = warning
+dotnet_diagnostic.CA2310.severity = warning
+dotnet_diagnostic.CA2311.severity = warning
+dotnet_diagnostic.CA2312.severity = warning
+dotnet_diagnostic.CA2321.severity = warning
+dotnet_diagnostic.CA2322.severity = warning
+dotnet_diagnostic.CA2326.severity = warning
+dotnet_diagnostic.CA2327.severity = warning
+dotnet_diagnostic.CA2328.severity = warning
+dotnet_diagnostic.CA2329.severity = warning
+dotnet_diagnostic.CA2330.severity = warning
+dotnet_diagnostic.CA2352.severity = warning
+dotnet_diagnostic.CA2353.severity = warning
+dotnet_diagnostic.CA2354.severity = warning
+dotnet_diagnostic.CA2355.severity = warning
+dotnet_diagnostic.CA2356.severity = warning
+dotnet_diagnostic.CA2362.severity = warning
+dotnet_diagnostic.CA3061.severity = warning
+dotnet_diagnostic.CA3075.severity = warning
+dotnet_diagnostic.CA3076.severity = warning
+dotnet_diagnostic.CA3077.severity = warning
+dotnet_diagnostic.CA3147.severity = warning
+dotnet_diagnostic.CA5350.severity = warning
+dotnet_diagnostic.CA5351.severity = warning
+dotnet_diagnostic.CA5358.severity = warning
+dotnet_diagnostic.CA5359.severity = warning
+dotnet_diagnostic.CA5360.severity = warning
+dotnet_diagnostic.CA5361.severity = warning
+dotnet_diagnostic.CA5362.severity = warning
+dotnet_diagnostic.CA5363.severity = warning
+dotnet_diagnostic.CA5364.severity = warning
+dotnet_diagnostic.CA5365.severity = warning
+dotnet_diagnostic.CA5367.severity = warning
+dotnet_diagnostic.CA5368.severity = warning
+dotnet_diagnostic.CA5373.severity = warning
+dotnet_diagnostic.CA5374.severity = warning
+dotnet_diagnostic.CA5375.severity = warning
+dotnet_diagnostic.CA5376.severity = warning
+dotnet_diagnostic.CA5377.severity = warning
+dotnet_diagnostic.CA5378.severity = warning
+dotnet_diagnostic.CA5379.severity = warning
+dotnet_diagnostic.CA5380.severity = warning
+dotnet_diagnostic.CA5381.severity = warning
+dotnet_diagnostic.CA5382.severity = warning
+dotnet_diagnostic.CA5383.severity = warning
+dotnet_diagnostic.CA5384.severity = warning
+dotnet_diagnostic.CA5385.severity = warning
+dotnet_diagnostic.CA5386.severity = warning
+dotnet_diagnostic.CA5387.severity = warning
+dotnet_diagnostic.CA5388.severity = warning
+dotnet_diagnostic.CA5391.severity = warning
+dotnet_diagnostic.CA5392.severity = warning
+dotnet_diagnostic.CA5393.severity = warning
+dotnet_diagnostic.CA5394.severity = warning
+dotnet_diagnostic.CA5395.severity = warning
+dotnet_diagnostic.CA5396.severity = warning
+dotnet_diagnostic.CA5397.severity = warning
+dotnet_diagnostic.CA5398.severity = warning
+dotnet_diagnostic.CA5399.severity = warning
+dotnet_diagnostic.CA5400.severity = warning
+dotnet_diagnostic.CA5401.severity = warning
+dotnet_diagnostic.CA5402.severity = warning
+dotnet_diagnostic.CA5404.severity = warning
+dotnet_diagnostic.CA5405.severity = warning
+
+# CWE-660 매핑 CA 규칙(매핑 근거 추적용 개별 명시)
+dotnet_diagnostic.CA1070.severity = warning
+dotnet_diagnostic.CA1000.severity = warning
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA1200.severity = warning
+# CA1031 - CWE-660 매핑: CWE-7, CWE-209, CWE-248, CWE-395, CWE-396, CWE-397, CWE-536, CWE-537, CWE-600
+dotnet_diagnostic.CA1031.severity = warning
+dotnet_diagnostic.CA1304.severity = warning
+# CA1046 - CWE-660 매핑: CWE-595
+dotnet_diagnostic.CA1046.severity = warning
+
+# CA1051 - CWE-660 매핑: CWE-487, CWE-492, CWE-493, CWE-608, CWE-766
+dotnet_diagnostic.CA1051.severity = warning
+
+# CA1052 - CWE-660 매핑: CWE-487
+dotnet_diagnostic.CA1052.severity = warning
+
+# CA1062 - CWE-660 매핑: CWE-103, CWE-105, CWE-108, CWE-109, CWE-110, CWE-476
+dotnet_diagnostic.CA1062.severity = warning
+
+# CA1066 - CWE-660 매핑: CWE-581
+dotnet_diagnostic.CA1066.severity = warning
+
+# CA1067 - CWE-660 매핑: CWE-581
+dotnet_diagnostic.CA1067.severity = warning
+
+# CA1309 - CWE-660 매핑: CWE-486, CWE-595, CWE-597
+dotnet_diagnostic.CA1309.severity = warning
+
+# CA1508 - CWE-660 매핑: CWE-478, CWE-617
+dotnet_diagnostic.CA1508.severity = warning
+
+# CA1805 - CWE-660 매핑: CWE-1235
+dotnet_diagnostic.CA1805.severity = warning
+
+# CA1806 - CWE-660 매핑: CWE-617
+dotnet_diagnostic.CA1806.severity = warning
+
+# CA1819 - CWE-660 매핑: CWE-374, CWE-375, CWE-495, CWE-496, CWE-582, CWE-607, CWE-767
+dotnet_diagnostic.CA1819.severity = warning
+
+# CA1822 - CWE-660 매핑: CWE-1235
+dotnet_diagnostic.CA1822.severity = warning
+
+# CA1823 - CWE-660 매핑: CWE-1235
+dotnet_diagnostic.CA1823.severity = warning
+
+# CA2000 - CWE-660 매핑: CWE-245, CWE-246, CWE-460, CWE-576, CWE-577, CWE-1341
+dotnet_diagnostic.CA2000.severity = warning
+
+# CA2002 - CWE-660 매핑: CWE-362, CWE-366, CWE-543, CWE-567, CWE-585, CWE-609
+dotnet_diagnostic.CA2002.severity = warning
+
+# CA2008 - CWE-660 매핑: CWE-383, CWE-572
+dotnet_diagnostic.CA2008.severity = warning
+
+# CA2200 - CWE-660 매핑: CWE-7, CWE-209, CWE-536, CWE-537
+dotnet_diagnostic.CA2200.severity = warning
+
+# CA2202 - CWE-660 매핑: CWE-1341
+dotnet_diagnostic.CA2202.severity = warning
+
+# CA2211 - CWE-660 매핑: CWE-492, CWE-493, CWE-500, CWE-582, CWE-607, CWE-766
+dotnet_diagnostic.CA2211.severity = warning
+
+# CA2213 - CWE-660 매핑: CWE-245, CWE-460
+dotnet_diagnostic.CA2213.severity = warning
+
+# CA2218 - CWE-660 매핑: CWE-581
+dotnet_diagnostic.CA2218.severity = warning
+
+# CA2224 - CWE-660 매핑: CWE-581
+dotnet_diagnostic.CA2224.severity = warning
+
+# CA2227 - CWE-660 매핑: CWE-374, CWE-375, CWE-495, CWE-496, CWE-607, CWE-767
+dotnet_diagnostic.CA2227.severity = warning
+
+# CA2233 - CWE-660 매핑: CWE-191, CWE-192, CWE-197, CWE-1335
+dotnet_diagnostic.CA2233.severity = warning
+
+# CA2235 - CWE-660 매핑: CWE-499, CWE-579, CWE-594
+dotnet_diagnostic.CA2235.severity = warning
+
+# CA2300 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2300.severity = warning
+
+# CA2301 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2301.severity = warning
+
+# CA2302 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2302.severity = warning
+
+# CA2303 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2303.severity = warning
+
+# CA2304 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2304.severity = warning
+
+# CA2305 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2305.severity = warning
+
+# CA2306 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2306.severity = warning
+
+# CA2307 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2307.severity = warning
+
+# CA2308 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2308.severity = warning
+
+# CA2309 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2309.severity = warning
+
+# CA2310 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2310.severity = warning
+
+# CA2311 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2311.severity = warning
+
+# CA2312 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2312.severity = warning
+
+# CA2313 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2313.severity = warning
+
+# CA2314 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2314.severity = warning
+
+# CA2315 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2315.severity = warning
+
+# CA2316 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2316.severity = warning
+
+# CA2317 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2317.severity = warning
+
+# CA2318 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2318.severity = warning
+
+# CA2319 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2319.severity = warning
+
+# CA2320 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2320.severity = warning
+
+# CA2321 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2321.severity = warning
+
+# CA2322 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2322.severity = warning
+
+# CA2323 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2323.severity = warning
+
+# CA2324 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2324.severity = warning
+
+# CA2325 - CWE-660 매핑: CWE-470, CWE-502
+dotnet_diagnostic.CA2325.severity = warning
+
+# CA2326 - CWE-660 매핑: CWE-470, CWE-499, CWE-502, CWE-579, CWE-594
+dotnet_diagnostic.CA2326.severity = warning
+
+# CA2327 - CWE-660 매핑: CWE-470, CWE-499, CWE-502, CWE-579, CWE-594
+dotnet_diagnostic.CA2327.severity = warning
+
+# CA2328 - CWE-660 매핑: CWE-470, CWE-499, CWE-502, CWE-579, CWE-594
+dotnet_diagnostic.CA2328.severity = warning
+
+# CA2329 - CWE-660 매핑: CWE-470, CWE-499, CWE-502, CWE-579, CWE-594
+dotnet_diagnostic.CA2329.severity = warning
+
+# CA2330 - CWE-660 매핑: CWE-499, CWE-579, CWE-594
+dotnet_diagnostic.CA2330.severity = warning
+
+# CA3002 - CWE-660 매핑: CWE-917, CWE-1336
+dotnet_diagnostic.CA3002.severity = warning
+
+# CA3006 - CWE-660 매핑: CWE-95, CWE-470, CWE-917, CWE-1336
+dotnet_diagnostic.CA3006.severity = warning
+
+# CA5359 - CWE-660 매핑: CWE-5
+dotnet_diagnostic.CA5359.severity = warning
+
+# CA5360 - CWE-660 매핑: CWE-5
+dotnet_diagnostic.CA5360.severity = warning
+
+# CA5364 - CWE-660 매핑: CWE-246, CWE-577
+dotnet_diagnostic.CA5364.severity = warning
+
+# CA5392 - CWE-660 매핑: CWE-111, CWE-578
+dotnet_diagnostic.CA5392.severity = warning
+
+# CA5393 - CWE-660 매핑: CWE-111, CWE-578
+dotnet_diagnostic.CA5393.severity = warning
+
+# CA5400 - CWE-660 매핑: CWE-5
+dotnet_diagnostic.CA5400.severity = warning
+
+# CA5404 - CWE-660 매핑: CWE-9
+dotnet_diagnostic.CA5404.severity = warning
+dotnet_diagnostic.SYSLIB1090.severity = warning
+
+[*.{cs,vb}]
+tab_width = 4
+indent_size = 4
+dotnet_style_qualification_for_field = true:silent
+dotnet_style_qualification_for_property = true:silent
+dotnet_style_qualification_for_method = true:silent
+dotnet_style_qualification_for_event = true:silent
+dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:silent
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:silent
+dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:silent
+dotnet_style_parentheses_in_other_operators = never_if_unnecessary:silent
+dotnet_code_quality_unused_parameters = all:suggestion
+dotnet_style_allow_multiple_blank_lines_experimental = true:silent
+dotnet_style_allow_statement_immediately_after_block_experimental = true:silent
+end_of_line = crlf
+dotnet_diagnostic.CA1822.severity = warning
+indent_style = tab
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+[*.vb]
+dotnet_diagnostic.CA1047.severity = warning

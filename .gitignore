@@ -1,0 +1,28 @@
+# 빌드 산출물
+bin/
+obj/
+publish/
+installer/Output/
+
+# FFmpeg 네이티브 DLL (fetch-ffmpeg.ps1 로 취득, 저장소에 커밋하지 않음)
+ffmpeg/*.dll
+
+# 사용자/IDE
+.vs/
+*.user
+
+# 동적검사 및 문서 작업 중간 산출물
+artifacts/
+.artifacts/
+.docwork/
+_qa_uncovered_report*/
+tools/**/artifacts/
+*.coverage
+/*.xml
+
+# 배포용 실행파일 묶음(소스와 문서는 별도 커밋)
+deliverables/EzStreamCoverageTool*/
+installer/Sample installer/
+
+# Microsoft Office 임시 잠금 파일
+~$*.docx

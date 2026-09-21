@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="AppName" xml:space="preserve"><value>EzStream Recorder</value></data>
+  <data name="LogTitle" xml:space="preserve"><value>EzStream Recorder — 로그</value></data>
+  <data name="AutoScroll" xml:space="preserve"><value>자동 스크롤</value></data>
+  <data name="OpenLogFolder" xml:space="preserve"><value>로그 폴더 열기</value></data>
+  <data name="ClearView" xml:space="preserve"><value>화면 지우기</value></data>
+  <data name="SettingsLoaded" xml:space="preserve"><value>현재 설정을 불러왔습니다.</value></data>
+  <data name="SettingsSaved" xml:space="preserve"><value>저장되었습니다. 실시간 적용됨.</value></data>
+  <data name="StatusTitle" xml:space="preserve"><value>EzStream Recorder — 상태</value></data>
+  <data name="OpenSavePath" xml:space="preserve"><value>📂  저장 경로 열기</value></data>
+  <data name="Settings" xml:space="preserve"><value>⚙  설정</value></data>
+  <data name="ViewLog" xml:space="preserve"><value>📄  로그 보기</value></data>
+  <data name="Connecting" xml:space="preserve"><value>연결 중...</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>EzStream Recorder — 설정</value></data>
+  <data name="SegmentMinutes" xml:space="preserve"><value>저장 주기(분)</value></data>
+  <data name="RetentionDays" xml:space="preserve"><value>보존 기간(일, 0=무제한)</value></data>
+  <data name="LogRetentionDays" xml:space="preserve"><value>로그 보존 기간(일, 0=무제한)</value></data>
+  <data name="DocumentRoot" xml:space="preserve"><value>저장 경로</value></data>
+  <data name="Sources" xml:space="preserve"><value>소스 목록</value></data>
+  <data name="UrlHeader" xml:space="preserve"><value>URL (rtsp://...)</value></data>
+  <data name="PathHeader" xml:space="preserve"><value>하위 경로</value></data>
+  <data name="PrefixHeader" xml:space="preserve"><value>파일 접두사</value></data>
+  <data name="SaveLive" xml:space="preserve"><value>저장(실시간 적용)</value></data>
+  <data name="Cancel" xml:space="preserve"><value>취소</value></data>
+</root>
