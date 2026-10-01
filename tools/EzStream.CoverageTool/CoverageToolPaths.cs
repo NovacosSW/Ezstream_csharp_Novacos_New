@@ -59,6 +59,10 @@ internal static class CoverageToolPaths
         if (bundled is not null)
             return bundled;
 
+        var installed = FindGlobalCoverageTool();
+        if (installed is not null)
+            return installed;
+
         var pathValue = Environment.GetEnvironmentVariable("PATH");
         if (string.IsNullOrWhiteSpace(pathValue))
             return null;
@@ -73,6 +77,25 @@ internal static class CoverageToolPaths
                 return candidate;
         }
         return null;
+    }
+
+    private static string? FindGlobalCoverageTool()
+    {
+        var candidates = new List<string>();
+        AddGlobalToolCandidate(candidates,
+            Environment.GetEnvironmentVariable("DOTNET_CLI_HOME"));
+        AddGlobalToolCandidate(candidates,
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+        return candidates
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(File.Exists);
+    }
+
+    private static void AddGlobalToolCandidate(List<string> candidates, string? home)
+    {
+        if (!string.IsNullOrWhiteSpace(home))
+            candidates.Add(Path.Combine(home, ".dotnet", "tools", CoverageExecutableName));
     }
 
     internal static string CoverageExecutablePath =>
