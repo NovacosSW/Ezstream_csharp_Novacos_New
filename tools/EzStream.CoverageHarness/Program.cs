@@ -1,5 +1,6 @@
 using System.Reflection;
 
+using EzStream.CoverageHarness.Scenarios;
 using EzStream.Core.Ffmpeg;
 using EzStream.Core.Recording;
 using EzStream.Service;
@@ -14,9 +15,12 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        var scenario = args.FirstOrDefault() ?? string.Empty;
+        if (string.Equals(scenario, "TRAY_PROGRAM_EXIT", StringComparison.Ordinal))
+            return RunTrayProgramExit();
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        var scenario = args.FirstOrDefault() ?? string.Empty;
         return IsTrayScenario(scenario)
             ? RunTrayScenario(scenario)
             : RunCoreScenario(scenario);
@@ -35,6 +39,7 @@ internal static class Program
                 "STREAM_INFO_FAILURE" => RunStreamInfoFailure(),
                 "SERVICE_LOG_LEVELS" => HasText(ServiceCoverageScenarios.RunServiceLogLevels()),
                 "RESIDUAL_BRANCHES" => HasText(ServiceCoverageScenarios.RunResidualBranches()),
+                "PIPE_ACCEPT_FAILURE" => HasText(ServiceCoverageScenarios.RunPipeAcceptFailure()),
                 "SERVICE_LIFECYCLE" => HasText(ServiceCoverageScenarios.RunServiceLifecycle()),
                 "WORKER_START_FAILURE" => HasText(ServiceCoverageScenarios.RunWorkerStartFailure()),
                 "RETENTION_ZERO" => RecorderCoverageScenarios.RunRetentionZero(),
@@ -146,6 +151,17 @@ internal static class Program
         return "OK|트레이 정상 종료를 실행했습니다.";
     }
 
+    private static int RunTrayProgramExit()
+    {
+        using var exitTimer = new System.Threading.Timer(
+            static _ => Application.Exit(),
+            null,
+            TimeSpan.FromMilliseconds(500),
+            Timeout.InfiniteTimeSpan);
+        InvokeStatic(typeof(EzStream.Tray.Program), "Main");
+        return WriteResult(true, "Tray Program.Main 정상 반환 완료");
+    }
+
     private static async Task<string> RunTrayProtocolAsync()
     {
         var empty = await TrayCoverageScenarios.RunAsync(string.Empty, CancellationToken.None)
@@ -177,7 +193,8 @@ internal static class Program
         => scenario is "STATUS" or "SETTINGS_SAVE" or "SETTINGS_CANCEL" or "LOG"
             or "LOG_FAILURE" or "LOG_MISSING_FOLDER" or "FOLDERS" or "FOLDER_FAILURE"
             or "SETTINGS_FAILURE" or "DISCONNECTED" or "ALL_CONNECTED"
-            or "ALL_CONNECTED_BRANCHES" or "APP_ACTIONS" or "EXIT" or "PROTOCOL";
+            or "ALL_CONNECTED_BRANCHES" or "APP_ACTIONS" or "EXIT" or "PROTOCOL"
+            or "TRAY_PROGRAM_EXIT";
 
     private static bool HasText(string value) => !string.IsNullOrWhiteSpace(value);
 
@@ -195,6 +212,9 @@ internal static class Program
     }
 
     private static object? InvokeStatic(Type type, string methodName)
-        => type.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic)?.Invoke(null, null)
+    {
+        MethodInfo method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new MissingMethodException(type.FullName, methodName);
+        return method.Invoke(null, null);
+    }
 }

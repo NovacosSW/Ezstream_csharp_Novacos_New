@@ -53,7 +53,15 @@ internal static class TrayCoverageRunner
         if (!covered.Succeeded)
             return covered;
 
-        return await StopActualTrayAsync(progress, cancellationToken).ConfigureAwait(false);
+        var stopped = await StopActualTrayAsync(progress, cancellationToken).ConfigureAwait(false);
+        if (!stopped.Succeeded)
+            return stopped;
+
+        return await RunAsync(
+            "TRAY_PROGRAM_EXIT",
+            "트레이 프로그램 정상 반환",
+            progress,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public static Task<TestResult> RunProtocolAsync(IProgress<string> progress, CancellationToken cancellationToken)
@@ -84,6 +92,14 @@ internal static class TrayCoverageRunner
         if (string.IsNullOrWhiteSpace(trayPath) || !File.Exists(trayPath))
             return new TestResult(false, "실행 중인 실제 EzStream.Tray.exe를 찾지 못했습니다.");
 
+        var session = await CoverageSessionManager.EnsureAsync(
+            CoverageSessionManager.TraySessionId,
+            "tray.coverage",
+            progress,
+            cancellationToken).ConfigureAwait(false);
+        if (!session.Succeeded)
+            return session;
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet-coverage",
@@ -93,8 +109,10 @@ internal static class TrayCoverageRunner
             RedirectStandardError = true,
         };
         startInfo.ArgumentList.Add("connect");
-        startInfo.ArgumentList.Add("EzStreamTrayLive");
+        startInfo.ArgumentList.Add(CoverageSessionManager.TraySessionId);
         startInfo.ArgumentList.Add(trayPath);
+        startInfo.ArgumentList.Add("--timeout");
+        startInfo.ArgumentList.Add("15000");
         progress.Report("실행 중인 Tray와 같은 실행 파일을 한 번 더 시작합니다.");
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("두 번째 Tray 실행을 시작하지 못했습니다.");

@@ -387,9 +387,17 @@ internal sealed class CoverageTestRunner
             var detected = await WaitForSourceErrorAsync(
                 error => error.Contains("open_input", StringComparison.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15), progress, cancellationToken).ConfigureAwait(false);
-            return new TestResult(detected,
-                detected ? "존재하지 않는 입력의 open_input 실패 분기를 실행했습니다."
-                    : "입력 열기 실패 상태를 확인하지 못했습니다.");
+            sources[0]!["url"] = "rtspu://127.0.0.1:1/coverage";
+            progress.Report("RTSP UDP 전송 주소의 입력 열기 실패 분기를 실행합니다.");
+            await IpcProbeClient.SetConfigJsonAsync(testConfig.ToJsonString(JsonOptions), cancellationToken)
+                .ConfigureAwait(false);
+            var udpDetected = await WaitForSourceErrorAsync(
+                error => error.Contains("open_input", StringComparison.OrdinalIgnoreCase),
+                TimeSpan.FromSeconds(15), progress, cancellationToken).ConfigureAwait(false);
+            return new TestResult(detected && udpDetected,
+                detected && udpDetected
+                    ? "존재하지 않는 입력과 RTSP UDP 주소의 open_input 실패 분기를 실행했습니다."
+                    : "일반 입력 또는 RTSP UDP 입력의 실패 상태를 확인하지 못했습니다.");
         }
         finally
         {
@@ -405,6 +413,15 @@ internal sealed class CoverageTestRunner
             "FFMPEG_BRANCHES", "FFmpeg 로그 레벨 9종과 기본값 매핑", progress, cancellationToken)
             .ConfigureAwait(false);
     }
+
+    public static Task<TestResult> RunPipeAcceptFailureTestAsync(
+        IProgress<string> progress,
+        CancellationToken cancellationToken)
+        => HarnessCoverageRunner.RunAsync(
+            "PIPE_ACCEPT_FAILURE",
+            "IPC 연결 중단 및 accept 재시도 취소",
+            progress,
+            cancellationToken);
 
     public static Task<TestResult> RunMissingTimestampTestAsync(
         IProgress<string> progress,

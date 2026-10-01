@@ -5,8 +5,8 @@ internal sealed class MainForm : Form
     private static readonly string WindowTitle = string.Concat("EzStream", " 커버리지 시험 도구");
     private static readonly string PageTitle = string.Concat("EzStream", " 외부 장애 조건 시험");
     private static readonly string UsageDescription =
-        string.Concat("Service는 EzStreamServiceLive, Tray는 EzStreamTrayLive 세션 ID로 동적검사를 시작하십시오. ",
-            "버튼 시험은 해당 PowerShell 동적검사 세션에 직접 연결되어 기록됩니다.");
+        string.Concat("시험 버튼을 누르면 Service와 Tray 동적검사 세션을 자동으로 시작하고 연결합니다. ",
+            "시험이 끝나면 최종 종료 버튼으로 커버리지 결과를 저장하십시오.");
     private static readonly string RestoreCaption = string.Concat("원래 설정", " 복구");
     private static readonly string PendingRestoreState =
         string.Concat("복구되지 않은 설정이 있습니다. ", "먼저 원래 설정 복구를 실행하십시오.");
@@ -59,6 +59,11 @@ internal sealed class MainForm : Form
         };
         AddTestButton(buttons, "★ TC-01~TC-19 전체 순차 실행", "종료 전 연결 상태 시험을 빠짐없이 실행",
             _tcRunner.RunConnectedRangeAsync);
+
+        AddTestButton(buttons, "▶ Service·Tray 커버리지 실행", "수집 세션 생성 후 실제 프로그램 자동 연결",
+            ProductSessionLauncher.PrepareAllAsync);
+        AddTestButton(buttons, "■ 커버리지 세션만 강제 종료", "긴급 정리용·결과 병합 안 함 (정상 종료는 TC-20/22)",
+            CoverageSessionManager.ResetAllAsync);
 
         AddSectionLabel(buttons, "1단계  서비스 재시작 필요 시험");
         AddTcButton(buttons, 1, "설정 파일 오류 및 복구", "없음·빈 파일·손상·저장 실패");
@@ -188,7 +193,16 @@ internal sealed class MainForm : Form
             return;
         }
 
-        if (RequiresConfirmation(name))
+        if (name.StartsWith('■'))
+        {
+            var answer = MessageBox.Show(
+                "이 기능은 Live 수집 세션만 종료하며 독립 시험 결과를 병합하지 않습니다. " +
+                "정상 시험 마무리에는 TC-20과 TC-22를 사용하십시오. 그래도 종료하시겠습니까?",
+                Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (answer != DialogResult.Yes)
+                return;
+        }
+        else if (RequiresConfirmation(name))
         {
             var answer = MessageBox.Show(
                 "시험용 로그·영상 파일을 만들거나 서비스 설정을 일시적으로 변경합니다. 계속하시겠습니까?",

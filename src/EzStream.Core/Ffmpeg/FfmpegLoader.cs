@@ -80,6 +80,7 @@ public static class FfmpegLoader
         const int bufSize = 1024;
         var buffer = stackalloc byte[bufSize];
         ffmpeg.av_strerror(errnum, buffer, bufSize);
-        return Marshal.PtrToStringAnsi((IntPtr)buffer) ?? $"error {errnum}";
+        // stackalloc 버퍼 자체는 null일 수 없고 av_strerror가 항상 C 문자열을 기록한다.
+        return Marshal.PtrToStringAnsi((IntPtr)buffer)!;
     }
 }

@@ -3,15 +3,17 @@ using System.Globalization;
 using System.IO.Pipes;
 using System.Resources;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 using EzStream.Core;
 using EzStream.Core.Config;
 using EzStream.Core.Ipc;
+using EzStream.Tray;
 
-namespace EzStream.Tray;
+namespace EzStream.CoverageHarness.Scenarios;
 
-internal static class TrayCoverageScenarios
+internal static partial class TrayCoverageScenarios
 {
     public static Task<string> RunAsync(string command, CancellationToken cancellationToken)
         => command switch
@@ -149,6 +151,7 @@ internal static class TrayCoverageScenarios
             form.Show();
             await Task.Delay(400, cancellationToken).ConfigureAwait(true);
             Directory.CreateDirectory(missingLogDir);
+            InvokeInstance(form, "FindLatestLog");
             await File.WriteAllTextAsync(
                 Path.Combine(missingLogDir, "ezstream-late.log"),
                 "late log",
@@ -161,7 +164,16 @@ internal static class TrayCoverageScenarios
             using var invalidForm = new LogViewerForm("\0");
             InvokeInstance(invalidForm, "FindLatestLog");
             InvokeInstance(invalidForm, "OpenLogFolder");
-            return "OK|없는 로그 폴더의 생성 전·후와 잘못된 경로 분기를 실행했습니다.";
+
+            var protectedLogDir = Path.Combine(
+                Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\",
+                "System Volume Information");
+            if (Directory.Exists(protectedLogDir))
+            {
+                using var protectedForm = new LogViewerForm(protectedLogDir);
+                InvokeInstance(protectedForm, "FindLatestLog");
+            }
+            return "OK|없는 로그 폴더, 빈 로그 폴더, 파일 생성 후, 잘못된 경로 및 접근 거부 분기를 실행했습니다.";
         }
         finally
         {
@@ -245,13 +257,7 @@ internal static class TrayCoverageScenarios
                 ?? throw new InvalidOperationException("저장 경로 시험 작업을 생성하지 못했습니다."));
             await task.ConfigureAwait(true);
 
-            using var closeDialogTimer = new System.Windows.Forms.Timer { Interval = 300 };
-            closeDialogTimer.Tick += (_, _) =>
-            {
-                closeDialogTimer.Stop();
-                SendKeys.SendWait("{ENTER}");
-            };
-            closeDialogTimer.Start();
+            using var closeDialogTimer = CreateDialogCloserTimer();
             await InvokeStatusOpenPathAsync(
                 form, Path.Combine(blockingFile, "dialog-child"), showDialog: true).ConfigureAwait(true);
             return "OK|잘못된 저장 경로의 트레이 폴더 열기 실패 분기를 실행했습니다.";
@@ -276,16 +282,42 @@ internal static class TrayCoverageScenarios
         statusForm.Close();
         settingsForm.Close();
 
-        var failureServer = ReplyWithFailureOnceAsync(cancellationToken);
-        using (var rejectedStatusForm = new StatusForm())
+        using (var defaultStatusForm = new StatusForm())
         {
-            rejectedStatusForm.Show();
-            await failureServer.ConfigureAwait(true);
-            await Task.Delay(300, cancellationToken).ConfigureAwait(true);
-            rejectedStatusForm.Dispose();
+            var statusDefaultServer = ReplyOnceAsync(
+                IpcResponse.Parse(
+                    "{\"ok\":true,\"status\":{\"documentRoot\":\"C:\\\\Windows\\\\Temp\",\"segmentMinutes\":10,\"sources\":[]}}")
+                    ?? throw new InvalidOperationException("시험용 상태 응답을 만들지 못했습니다."),
+                cancellationToken);
+            await InvokeStatusOpenPathAsync(defaultStatusForm, null, showDialog: false).ConfigureAwait(true);
+            await statusDefaultServer.ConfigureAwait(true);
+
+            var statusFallbackServer = ReplyOnceAsync(
+                new IpcResponse { Ok = true }, cancellationToken);
+            await InvokeStatusOpenPathAsync(defaultStatusForm, null, showDialog: false).ConfigureAwait(true);
+            await statusFallbackServer.ConfigureAwait(true);
         }
 
-        return "OK|상태·설정 연결 실패, 저장 경로 기본값 및 서비스 실패 응답을 실행했습니다.";
+        // StatusForm의 경로 열기와 별개로 실제 트레이 메뉴가 사용하는 정적 메서드도
+        // 서비스 미연결 상태에서 실행해 예외 처리와 경고 표시를 확인한다.
+        using (var closeDialogTimer = CreateDialogCloserTimer())
+        {
+            await InvokeTrayOpenPathAsync().ConfigureAwait(true);
+            closeDialogTimer.Stop();
+        }
+
+        var trayDefaultServer = ReplyOnceAsync(
+            new IpcResponse { Ok = true }, cancellationToken);
+        await InvokeTrayOpenPathAsync().ConfigureAwait(true);
+        await trayDefaultServer.ConfigureAwait(true);
+
+        var failureServer = ReplyWithFailureOnceAsync(cancellationToken);
+        using var rejectedStatusForm = new StatusForm();
+        rejectedStatusForm.Show();
+        await failureServer.ConfigureAwait(true);
+        await Task.Delay(300, cancellationToken).ConfigureAwait(true);
+
+        return "OK|상태·설정 연결 실패, 트레이 메뉴 경로 오류, 저장 경로 기본값 및 서비스 실패 응답을 실행했습니다.";
     }
 
     private static async Task<string> RunAllConnectedAsync(CancellationToken cancellationToken)
@@ -469,6 +501,15 @@ internal static class TrayCoverageScenarios
             ?? throw new InvalidOperationException("저장 경로 시험 작업을 생성하지 못했습니다."));
     }
 
+    private static Task InvokeTrayOpenPathAsync()
+    {
+        MethodInfo method = typeof(TrayApp).GetMethod(
+            "OpenSavePathAsync", BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(TrayApp).FullName, "OpenSavePathAsync");
+        return (Task)(method.Invoke(null, null)
+            ?? throw new InvalidOperationException("트레이 메뉴 저장 경로 시험 작업을 생성하지 못했습니다."));
+    }
+
     private static void ExerciseMissingUiResource()
     {
         try
@@ -507,6 +548,13 @@ internal static class TrayCoverageScenarios
     }
 
     private static async Task ReplyWithFailureOnceAsync(CancellationToken cancellationToken)
+        => await ReplyOnceAsync(
+            new IpcResponse { Ok = false, Message = "coverage rejected" },
+            cancellationToken).ConfigureAwait(true);
+
+    private static async Task ReplyOnceAsync(
+        IpcResponse response,
+        CancellationToken cancellationToken)
     {
         using var server = new NamedPipeServerStream(
             AppPaths.PipeName,
@@ -518,7 +566,6 @@ internal static class TrayCoverageScenarios
         using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, leaveOpen: true);
         using var writer = new StreamWriter(server, new UTF8Encoding(false)) { AutoFlush = true };
         _ = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(true);
-        var response = new IpcResponse { Ok = false, Message = "coverage rejected" };
         await writer.WriteLineAsync(response.Serialize().AsMemory(), cancellationToken).ConfigureAwait(true);
     }
 
@@ -538,6 +585,35 @@ internal static class TrayCoverageScenarios
             foreach (Control child in current.Controls)
                 pending.Push(child);
         }
+    }
+
+    private static partial class NativeMethods
+    {
+        [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static partial IntPtr FindWindow(string? className, string? windowName);
+
+        [LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool PostMessage(
+            IntPtr windowHandle,
+            uint message,
+            IntPtr wordParameter,
+            IntPtr longParameter);
+    }
+
+    private static System.Windows.Forms.Timer CreateDialogCloserTimer()
+    {
+        var timer = new System.Windows.Forms.Timer { Interval = 50 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = NativeMethods.FindWindow("#32770", "EzStream");
+            if (dialog != IntPtr.Zero)
+                _ = NativeMethods.PostMessage(dialog, 0x0010, IntPtr.Zero, IntPtr.Zero);
+        };
+        timer.Start();
+        return timer;
     }
 
     private static Button FindButton(Control root, string text)

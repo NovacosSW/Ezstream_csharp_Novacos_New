@@ -102,13 +102,9 @@ internal sealed class LogViewerForm : Form
             _header.Text = $"파일: {_currentFile}";
         }
 
-        if (_currentFile == null)
-        {
-            var l = FindLatestLog();
-            if (l == null) return;
-            _currentFile = l;
-            _header.Text = $"파일: {_currentFile}";
-        }
+        // 이번 tick에서 찾지 못했으면 다음 tick에서 다시 찾는다. 같은 tick 안에서
+        // 디렉터리를 두 번 조회해도 사용자에게 보이는 갱신 주기는 달라지지 않는다.
+        if (_currentFile == null) return;
 
         try
         {
@@ -119,8 +115,6 @@ internal sealed class LogViewerForm : Form
             using var sr = new StreamReader(fs, Encoding.UTF8);
             var chunk = sr.ReadToEnd();
             _position = fs.Position;
-            if (chunk.Length == 0) return;
-
             AppendText(chunk);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))

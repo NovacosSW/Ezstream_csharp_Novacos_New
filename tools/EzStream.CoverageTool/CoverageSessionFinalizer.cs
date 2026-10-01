@@ -48,6 +48,20 @@ internal static class CoverageSessionFinalizer
             progress,
             cancellationToken);
 
+    public static async Task<TestResult> SnapshotServiceCheckpointAsync(
+        IProgress<string> progress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        var outputPath = Path.Combine(
+            FindOutputDirectory(), "service_TC05_TC20_checkpoint.coverage");
+        var saved = await SnapshotAsync(
+            ServiceSessionId, outputPath, progress, cancellationToken).ConfigureAwait(false);
+        return saved
+            ? new TestResult(true, $"Service 종료 전 체크포인트 저장 완료: {outputPath}")
+            : new TestResult(false, "Service 종료 전 체크포인트 저장에 실패했습니다.");
+    }
+
     public static Task<TestResult> FinalizeTrayAsync(
         IProgress<string> progress,
         CancellationToken cancellationToken)
@@ -58,6 +72,34 @@ internal static class CoverageSessionFinalizer
             "Tray",
             progress,
             cancellationToken);
+
+    internal static void ClearTransientServiceCoverageFiles(IProgress<string> progress)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        var outputDirectory = FindOutputDirectory();
+        string[] fileNames =
+        [
+            "service_TC12_unsupported.coverage",
+            "service_TC19_lifecycle.coverage",
+            "service_TC20_lifecycle.coverage",
+            "service_TC05_TC20_checkpoint.coverage",
+            "service_TC05_TC20_live.coverage",
+        ];
+
+        var deleted = 0;
+        foreach (var fileName in fileNames)
+        {
+            var path = Path.Combine(outputDirectory, fileName);
+            if (!File.Exists(path))
+                continue;
+
+            File.Delete(path);
+            deleted++;
+        }
+
+        if (deleted > 0)
+            progress.Report($"이전 시험 회차의 Service 중간 결과 {deleted}개를 정리했습니다.");
+    }
 
     private static async Task<TestResult> FinalizeProductAsync(
         string sessionId,
@@ -100,8 +142,8 @@ internal static class CoverageSessionFinalizer
         {
             liveCoveragePath ?? outputPath,
             Path.Combine(outputDirectory, "service_TC12_unsupported.coverage"),
-            Path.Combine(outputDirectory, "service_TC19_lifecycle.coverage"),
             Path.Combine(outputDirectory, "service_TC20_lifecycle.coverage"),
+            Path.Combine(outputDirectory, "service_TC05_TC20_checkpoint.coverage"),
         };
         var inputs = candidates
             .Where(path => File.Exists(path) && new FileInfo(path).Length > 10)
@@ -199,6 +241,7 @@ internal static class CoverageSessionFinalizer
             if (!result.Succeeded)
                 break;
             progress.Report($"{sessionId} 수집 세션을 종료했습니다.");
+            CoverageSessionManager.Forget(sessionId);
         }
     }
 

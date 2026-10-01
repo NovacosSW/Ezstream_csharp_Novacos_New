@@ -13,7 +13,7 @@ internal sealed class TrayApp : ApplicationContext
     {
         var menu = new ContextMenuStrip();
         menu.Items.Add("상태 보기", null, (_, _) => ShowStatus());
-        menu.Items.Add("저장 경로 열기", null, async (_, _) => await OpenSavePathAsync() . ConfigureAwait ( false ) );
+        menu.Items.Add("저장 경로 열기", null, async (_, _) => await OpenSavePathAsync().ConfigureAwait(true));
         menu.Items.Add("설정", null, (_, _) => ShowSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("종료", null, (_, _) => ExitApp());
@@ -52,7 +52,8 @@ internal sealed class TrayApp : ApplicationContext
     {
         try
         {
-            var resp = await PipeClient.SendAsync(new IpcRequest { Command = IpcCommands.GetStatus }) . ConfigureAwait ( false );
+            var resp = await PipeClient.SendAsync(new IpcRequest { Command = IpcCommands.GetStatus })
+                .ConfigureAwait(true);
             var path = resp.Status?.DocumentRoot;
             if (string.IsNullOrWhiteSpace(path))
                 path = EzStream.Core.Config.RecorderConfig.DefaultDocumentRoot();

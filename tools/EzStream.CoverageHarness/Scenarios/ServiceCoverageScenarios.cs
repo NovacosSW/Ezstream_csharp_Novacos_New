@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Collections;
+using System.IO.Pipes;
+using System.Text;
 
 using EzStream.Core;
 using EzStream.Core.Config;
@@ -8,6 +10,7 @@ using EzStream.Core.Ipc;
 using EzStream.Core.Notifications;
 using EzStream.Core.Recording;
 using EzStream.Core.Retention;
+using EzStream.Service;
 
 using FFmpeg.AutoGen;
 
@@ -16,7 +19,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Hosting;
 
-namespace EzStream.Service;
+namespace EzStream.CoverageHarness.Scenarios;
 
 internal static class ServiceCoverageScenarios
 {
@@ -171,6 +174,8 @@ internal static class ServiceCoverageScenarios
         ExerciseGeneratedLogs(logger);
         ExerciseFfmpegMapping();
         ExerciseFfmpegEmptyDirectory(logger);
+        ExerciseFfmpegCallbackBranches();
+        ExerciseFileLoggerException();
         ExerciseStartupOptions();
         ExerciseModelBranches();
         ExerciseRecorderReporting(logger);
@@ -178,10 +183,51 @@ internal static class ServiceCoverageScenarios
         ExercisePipeStopFailure(logger);
         ExerciseWorkerCleanupBranches();
         ExerciseEngineBranches(logger);
+        if (!RecorderCoverageScenarios.RunRecorderLoopException())
+            throw new InvalidOperationException("녹화기 최상위 예외 복구 분기를 확인하지 못했습니다.");
+        if (!RecorderCoverageScenarios.RunRtspUdpInputFailure())
+            throw new InvalidOperationException("RTSP UDP 입력 실패 분기를 확인하지 못했습니다.");
         ExerciseRetentionFailure(logger);
         ExerciseRetentionDirectoryFailure(logger);
         ExerciseUdpEndpointBranches(logger);
         return $"residual branches completed ({logger.MessagesFormatted} messages)";
+    }
+
+    public static string RunPipeAcceptFailure()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(), "ezstream-pipe-abort-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var logger = new ExercisingLogger();
+        try
+        {
+            using var engine = new RecorderEngine(new RecorderConfig(), logger);
+            using var pipe = new PipeServer(engine, Path.Combine(root, "config.json"), logger);
+            pipe.Start();
+            Thread.Sleep(100);
+
+            using (var client = new NamedPipeClientStream(
+                ".", AppPaths.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous))
+            {
+                client.Connect(3000);
+                var request = Encoding.UTF8.GetBytes(
+                    new IpcRequest { Command = IpcCommands.GetStatus }.Serialize());
+                client.Write(request);
+                client.Flush();
+            }
+
+            for (var attempt = 0; attempt < 100 && logger.PipeAcceptErrors == 0; attempt++)
+                Thread.Sleep(10);
+            pipe.Stop();
+            if (logger.PipeAcceptErrors == 0)
+                throw new InvalidOperationException("IPC 연결 중단 예외를 확인하지 못했습니다.");
+            return "pipe accept failure completed";
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
     }
 
     private static void ExerciseGeneratedLogs(ILogger logger)
@@ -214,6 +260,34 @@ internal static class ServiceCoverageScenarios
     {
         ffmpeg.RootPath = Path.Combine(AppContext.BaseDirectory, "ffmpeg");
         FfmpegLoader.Initialize(string.Empty, "warning", logger);
+    }
+
+    private static unsafe void ExerciseFfmpegCallbackBranches()
+    {
+        FieldInfo callbackField = typeof(FfmpegLoader).GetField(
+            "_logCallback", BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(FfmpegLoader).FullName, "_logCallback");
+        var callback = (av_log_set_callback_callback)(callbackField.GetValue(null)
+            ?? throw new InvalidOperationException("FFmpeg 로그 콜백이 초기화되지 않았습니다."));
+
+        callback(null, int.MaxValue, string.Empty, null);
+        callback(null, ffmpeg.av_log_get_level(), string.Empty, null);
+    }
+
+    private static void ExerciseFileLoggerException()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(), "ezstream-log-exception-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var provider = new FileLoggerProvider(root);
+            provider.Write("Coverage.Exception", LogLevel.Error, "coverage", new IOException("coverage"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
     }
 
     private static void ExerciseStartupOptions()
@@ -471,6 +545,7 @@ internal static class ServiceCoverageScenarios
     private sealed class ExercisingLogger : ILogger, ILogger<Worker>
     {
         public int MessagesFormatted { get; private set; }
+        public int PipeAcceptErrors { get; private set; }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
             => EmptyScope.Instance;
@@ -488,6 +563,8 @@ internal static class ServiceCoverageScenarios
             _ = eventId;
             _ = formatter(state, exception);
             MessagesFormatted++;
+            if (eventId.Id == 101)
+                PipeAcceptErrors++;
 
             if (state is IReadOnlyList<KeyValuePair<string, object?>> values)
             {

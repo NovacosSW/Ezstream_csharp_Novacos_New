@@ -1,8 +1,10 @@
 using FFmpeg.AutoGen;
 
+using EzStream.Core;
 using EzStream.Core.Config;
 using EzStream.Core.Ffmpeg;
 using EzStream.Core.Ipc;
+using EzStream.Core.Recording;
 using EzStream.Core.Retention;
 
 using Microsoft.Extensions.Logging;
@@ -13,7 +15,7 @@ using System.Reflection;
 using System.Text;
 using System.Drawing.Imaging;
 
-namespace EzStream.Core.Recording;
+namespace EzStream.CoverageHarness.Scenarios;
 
 internal static class RecorderCoverageScenarios
 {
@@ -89,6 +91,77 @@ internal static class RecorderCoverageScenarios
         var recorder = new SourceRecorder(source, config, NullLogger.Instance);
         recorder.UpdateSegmentMinutes(config.SegmentMillis);
         return recorder.Snapshot().State == "INIT";
+    }
+
+    public static bool RunRecorderLoopException()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(), "ezstream-recorder-loop-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var inputPath = Path.Combine(root, "input.gif");
+        var blockingRoot = Path.Combine(root, "blocked-root");
+        using (var bitmap = new Bitmap(32, 32))
+            bitmap.Save(inputPath, ImageFormat.Gif);
+        File.WriteAllText(blockingRoot, "coverage");
+
+        const string marker = "coverage notification failure";
+        FfmpegLoader.Initialize(
+            Path.Combine(AppContext.BaseDirectory, "ffmpeg"),
+            "warning",
+            NullLogger.Instance);
+        var recorder = new SourceRecorder(
+            new SourceConfig
+            {
+                Url = new Uri(inputPath),
+                Path = "coverage-loop",
+                FilePrefix = "coverage_loop",
+            },
+            new RecorderConfig { DocumentRoot = blockingRoot },
+            NullLogger.Instance,
+            static _ => throw new IOException(marker));
+        try
+        {
+            recorder.Start();
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                if (string.Equals(recorder.Snapshot().LastError, marker, StringComparison.Ordinal))
+                    return true;
+                Thread.Sleep(50);
+            }
+            return false;
+        }
+        finally
+        {
+            recorder.Stop();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    public static bool RunRtspUdpInputFailure()
+    {
+        FfmpegLoader.Initialize(
+            Path.Combine(AppContext.BaseDirectory, "ffmpeg"),
+            "warning",
+            NullLogger.Instance);
+        var recorder = new SourceRecorder(
+            new SourceConfig
+            {
+                Url = new Uri("rtspu://127.0.0.1:1/coverage"),
+                Path = "coverage-rtsp-udp",
+                FilePrefix = "coverage_rtsp_udp",
+            },
+            new RecorderConfig(),
+            NullLogger.Instance);
+        try
+        {
+            InvokeRecorder(recorder, "RunOnce");
+            return recorder.Snapshot().LastError?.Contains(
+                "open_input", StringComparison.OrdinalIgnoreCase) == true;
+        }
+        finally
+        {
+            InvokeRecorder(recorder, "CloseInput");
+        }
     }
 
     public static bool RunUnsupportedCodecHeader()

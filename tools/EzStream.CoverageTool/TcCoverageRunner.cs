@@ -19,6 +19,15 @@ internal sealed class TcCoverageRunner
         if (!_plans.TryGetValue(number, out var plan))
             return new TestResult(false, $"TC-{number:00} 시험 계획을 찾지 못했습니다.");
 
+        if (number <= 20)
+        {
+            var serviceReady = await ProductSessionLauncher.EnsureServiceAsync(progress, cancellationToken)
+                .ConfigureAwait(false);
+            progress.Report(serviceReady.Summary);
+            if (!serviceReady.Succeeded)
+                return serviceReady;
+        }
+
         var completed = 0;
         var failures = new List<string>();
         progress.Report($"TC-{number:00} {plan.Title}: {plan.Steps.Count}개 세부 시험을 시작합니다.");
@@ -58,7 +67,8 @@ internal sealed class TcCoverageRunner
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(progress);
-        var serviceReady = await ProductSessionLauncher.EnsureServiceAsync(progress, cancellationToken)
+        progress.Report("전체시험을 새 회차로 시작하기 위해 기존 세션과 프로그램을 정리합니다.");
+        var serviceReady = await ProductSessionLauncher.PrepareAllAsync(progress, cancellationToken)
             .ConfigureAwait(false);
         progress.Report(serviceReady.Summary);
         if (!serviceReady.Succeeded)
@@ -149,6 +159,10 @@ internal sealed class TcCoverageRunner
                 Step("Service 정상 종료 수명주기", (progress, cancellationToken) =>
                     RunStandaloneServiceLifecycleAsync(
                         "service_TC20_lifecycle.coverage", progress, cancellationToken)),
+                Step("Service 종료 전 결과 저장", CoverageSessionFinalizer.SnapshotServiceCheckpointAsync),
+                Step("실제 Service 실행 종료", ProductSessionLauncher.StopServiceForFinalCoverageAsync),
+                Step("Service 비콘솔 모드", ProductSessionLauncher.RunServiceWithoutConsoleForCoverageAsync),
+                Step("IPC 연결 중단 복구", CoverageTestRunner.RunPipeAcceptFailureTestAsync),
                 Step("Service 결과 저장·종료", CoverageSessionFinalizer.FinalizeServiceAsync)),
             [21] = Plan("서비스 미연결 상태의 트레이 기능",
                 Step("서비스 미연결 표시", TrayCoverageRunner.RunDisconnectedAsync),

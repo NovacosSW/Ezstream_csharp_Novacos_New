@@ -27,7 +27,11 @@ internal sealed class FileLoggerProvider : ILoggerProvider
     {
         var shortCat = category.Contains('.', StringComparison.Ordinal) ? category[(category.LastIndexOf('.') + 1)..] : category;
         var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{Short(level)}] [{shortCat}] {message}";
-        if (ex != null) line += Environment.NewLine + ex;
+        if (ex is not null)
+        {
+            line += Environment.NewLine;
+            line += ex.ToString();
+        }
 
         lock (_lock)
         {

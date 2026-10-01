@@ -4,9 +4,6 @@ namespace EzStream.CoverageTool;
 internal static class HarnessCoverageRunner
 {
     private const string HarnessFileName = "EzStream.CoverageHarness.exe";
-    private const string ServiceSessionId = "EzStreamServiceLive";
-    private const string TraySessionId = "EzStreamTrayLive";
-
     public static async Task<TestResult> RunAsync(
         string scenario,
         string description,
@@ -19,7 +16,17 @@ internal static class HarnessCoverageRunner
         if (harnessPath is null)
             return new TestResult(false, "외부 시험 실행기 EzStream.CoverageHarness.exe를 찾지 못했습니다.");
 
-        var sessionId = IsTrayScenario(scenario) ? TraySessionId : ServiceSessionId;
+        var isTrayScenario = IsTrayScenario(scenario);
+        var sessionId = isTrayScenario
+            ? CoverageSessionManager.TraySessionId
+            : CoverageSessionManager.ServiceSessionId;
+        var session = await CoverageSessionManager.EnsureAsync(
+            sessionId,
+            isTrayScenario ? "tray.coverage" : "service.coverage",
+            progress,
+            cancellationToken).ConfigureAwait(false);
+        if (!session.Succeeded)
+            return session;
 
         var startInfo = new ProcessStartInfo
         {
@@ -33,6 +40,8 @@ internal static class HarnessCoverageRunner
         startInfo.ArgumentList.Add(sessionId);
         startInfo.ArgumentList.Add(harnessPath);
         startInfo.ArgumentList.Add(scenario);
+        startInfo.ArgumentList.Add("--timeout");
+        startInfo.ArgumentList.Add("15000");
 
         progress.Report($"{description} 시험을 {sessionId} 동적검사 세션에서 실행합니다.");
         using var process = Process.Start(startInfo)
@@ -121,14 +130,16 @@ internal static class HarnessCoverageRunner
     private static string BuildConnectionFailure(string sessionId, string output, string error)
     {
         var diagnostic = string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim();
-        return $"{sessionId} 동적검사 세션 연결에 실패했습니다. 사용방법의 PowerShell 명령으로 세션을 먼저 실행하십시오. {diagnostic}";
+        CoverageSessionManager.Forget(sessionId);
+        return $"{sessionId} 동적검사 세션 연결에 실패했습니다. 자동 세션을 다시 시작한 뒤 재시험하십시오. {diagnostic}";
     }
 
     private static bool IsTrayScenario(string scenario)
         => scenario is "STATUS" or "SETTINGS_SAVE" or "SETTINGS_CANCEL" or "LOG"
             or "LOG_FAILURE" or "LOG_MISSING_FOLDER" or "FOLDERS" or "FOLDER_FAILURE"
             or "SETTINGS_FAILURE" or "DISCONNECTED" or "ALL_CONNECTED"
-            or "ALL_CONNECTED_BRANCHES" or "APP_ACTIONS" or "EXIT" or "PROTOCOL";
+            or "ALL_CONNECTED_BRANCHES" or "APP_ACTIONS" or "EXIT" or "PROTOCOL"
+            or "TRAY_PROGRAM_EXIT";
 
     private static string? FindHarnessPath()
     {

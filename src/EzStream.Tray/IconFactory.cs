@@ -10,8 +10,8 @@ internal static class IconFactory
     public static Icon CreateRecIcon(bool active)
     {
         using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
         {
+            using var g = Graphics.FromImage(bmp);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(Color.Transparent);
             // 카메라 몸통
@@ -40,6 +40,7 @@ internal static class IconFactory
 file static class GraphicsExtensions
 {
     public static void FillRoundedRectangle(this Graphics g, Brush brush, Rectangle r, int radius)
+
     {
         using var path = new System.Drawing.Drawing2D.GraphicsPath();
         int d = radius * 2;
