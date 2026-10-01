@@ -65,7 +65,7 @@ internal static class CoverageSessionManager
                     return new TestResult(false, $"기존 {sessionId} 수집 세션을 정리하지 못했습니다.");
             }
 
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, "Coverage.runsettings");
+            var settingsPath = CoverageToolPaths.SettingsPath;
             if (!File.Exists(settingsPath))
                 return new TestResult(false, "Coverage.runsettings 파일을 찾지 못했습니다.");
 
@@ -153,7 +153,7 @@ internal static class CoverageSessionManager
     {
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -195,7 +195,7 @@ internal static class CoverageSessionManager
     {
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
         };

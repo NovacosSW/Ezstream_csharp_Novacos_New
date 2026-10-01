@@ -187,20 +187,7 @@ internal static class CoverageSessionFinalizer
     }
 
     internal static string FindOutputDirectory()
-    {
-        string[] candidates =
-        [
-            Directory.GetCurrentDirectory(),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-                "..", "..", "..", "..", "..", "..",
-                "src", "EzStream.Tray", "bin", "Debug", "net9.0-windows", "win-x64")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-                "..", "..", "src", "EzStream.Tray", "bin", "Debug", "net9.0-windows", "win-x64")),
-        ];
-        return candidates.FirstOrDefault(
-            directory => File.Exists(Path.Combine(directory, "EzStream.Tray.exe")))
-            ?? AppContext.BaseDirectory;
-    }
+        => CoverageToolPaths.ResultsDirectory;
 
     private static void StopProductProcesses(IProgress<string> progress)
     {
@@ -251,7 +238,7 @@ internal static class CoverageSessionFinalizer
     {
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,

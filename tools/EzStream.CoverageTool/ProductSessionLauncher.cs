@@ -13,6 +13,11 @@ internal static class ProductSessionLauncher
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(progress);
+        var deployment = CoverageToolPaths.ValidateDeployment(progress);
+        progress.Report(deployment.Summary);
+        if (!deployment.Succeeded)
+            return deployment;
+
         progress.Report("기존 Service·Tray 프로그램과 커버리지 수집 세션을 정리합니다.");
         var reset = await CoverageSessionManager.ResetAllAsync(progress, cancellationToken)
             .ConfigureAwait(false);
@@ -157,7 +162,7 @@ internal static class ProductSessionLauncher
         IProgress<string> progress,
         CancellationToken cancellationToken)
     {
-        var trayPath = FindProductPath("EzStream.Tray", "EzStream.Tray.exe");
+        var trayPath = CoverageToolPaths.FindProductExecutable("EzStream.Tray", "EzStream.Tray.exe");
         if (trayPath is null)
             return new TestResult(false, "EzStream.Tray.exe Debug 실행 파일을 찾지 못했습니다.");
 
@@ -242,7 +247,7 @@ internal static class ProductSessionLauncher
     {
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
@@ -303,25 +308,5 @@ internal static class ProductSessionLauncher
     }
 
     private static string? FindServicePath()
-        => FindProductPath("EzStream.Service", "EzStream.Service.exe");
-
-    private static string? FindProductPath(string projectName, string executableName)
-    {
-        foreach (var startDirectory in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
-        {
-            var directory = new DirectoryInfo(startDirectory);
-            while (directory is not null)
-            {
-                var candidate = Path.Combine(directory.FullName,
-                    "src", projectName, "bin", "Debug",
-                    "net9.0-windows", "win-x64", executableName);
-                if (File.Exists(candidate))
-                    return candidate;
-                directory = directory.Parent;
-            }
-        }
-
-        var bundledPath = Path.Combine(AppContext.BaseDirectory, "Harness", executableName);
-        return File.Exists(bundledPath) ? bundledPath : null;
-    }
+        => CoverageToolPaths.FindProductExecutable("EzStream.Service", "EzStream.Service.exe");
 }

@@ -12,7 +12,7 @@ internal static class HarnessCoverageRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scenario);
         ArgumentNullException.ThrowIfNull(progress);
-        var harnessPath = FindHarnessPath();
+        var harnessPath = CoverageToolPaths.FindHarnessExecutable(HarnessFileName);
         if (harnessPath is null)
             return new TestResult(false, "외부 시험 실행기 EzStream.CoverageHarness.exe를 찾지 못했습니다.");
 
@@ -30,7 +30,7 @@ internal static class HarnessCoverageRunner
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -76,11 +76,11 @@ internal static class HarnessCoverageRunner
         ArgumentException.ThrowIfNullOrWhiteSpace(scenario);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputFileName);
         ArgumentNullException.ThrowIfNull(progress);
-        var harnessPath = FindHarnessPath();
+        var harnessPath = CoverageToolPaths.FindHarnessExecutable(HarnessFileName);
         if (harnessPath is null)
             return new TestResult(false, "외부 시험 실행기 EzStream.CoverageHarness.exe를 찾지 못했습니다.");
 
-        var settingsPath = Path.Combine(AppContext.BaseDirectory, "Coverage.runsettings");
+        var settingsPath = CoverageToolPaths.SettingsPath;
         if (!File.Exists(settingsPath))
             return new TestResult(false, "Coverage.runsettings 파일을 찾지 못했습니다.");
 
@@ -88,7 +88,7 @@ internal static class HarnessCoverageRunner
         File.Delete(outputPath);
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -141,22 +141,4 @@ internal static class HarnessCoverageRunner
             or "ALL_CONNECTED_BRANCHES" or "APP_ACTIONS" or "EXIT" or "PROTOCOL"
             or "TRAY_PROGRAM_EXIT";
 
-    private static string? FindHarnessPath()
-    {
-        string[] candidates =
-        [
-            Path.Combine(AppContext.BaseDirectory, "Harness", HarnessFileName),
-            Path.Combine(AppContext.BaseDirectory, HarnessFileName),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-                "..", "..", "..", "..", "..", "EzStream.CoverageHarness",
-                "bin", "Debug", "net9.0-windows", "win-x64", HarnessFileName)),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-                "..", "..", "..", "..", "..", "EzStream.CoverageHarness",
-                "bin", "Release", "net9.0-windows", "win-x64", HarnessFileName)),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(),
-                "tools", "EzStream.CoverageHarness", "bin", "Debug",
-                "net9.0-windows", "win-x64", HarnessFileName)),
-        ];
-        return candidates.FirstOrDefault(File.Exists);
-    }
 }

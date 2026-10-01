@@ -102,7 +102,7 @@ internal static class TrayCoverageRunner
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = "dotnet-coverage",
+            FileName = CoverageToolPaths.CoverageExecutablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
