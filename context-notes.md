@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## TC-12 코덱 파라미터 복사 실패 구현
+
+- 사용자 승인에 따라 TC-12에 복사 실패를 추가한다. 제품은 유지하고 시험 프로세스의 복사 바인딩만 ENOMEM을 반환하도록 제어한다. 실제 메모리 고갈 재현은 아니다.
+- 기존 출력 준비 실패 Harness에 Failure 열거형으로 세 모드를 명시하고 PARAMETERS_COPY_FAILURE를 TC-12에 추가했다. 콜백에서 실제 출력 스트림 1개, 대상/원본 codecpar 포인터 일치 및 비디오 입력을 검증한다. 새 대상에 기존 extradata가 없음을 확인하고 구조체 복사 후 extradata=null/크기=0으로 만들어 FFmpeg 4.4 실패 직후 상태를 모사한 뒤 ENOMEM을 반환한다. 실제 네이티브 복사 함수의 메모리 할당 실패를 실행한 것은 아니다.
+- 오류 상태 parameters_copy, 실패 저장 알림 정확히 1회(오류 일치·파일 크기 0), MP4 미생성, STOPPED, 입출력 컨텍스트 null, 입력 파일 배타적 재열기 및 바인딩 복원을 검증했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션 CoverageTool 빌드 성공. 모두 경고/오류 0개.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe PARAMETERS_COPY_FAILURE`와 NEW_STREAM_FAILURE, ALLOC_OUTPUT_FAILURE를 각각 실행하여 모두 통과했다. artifacts/parameters-copy-integration/result.xml에서 대상 369~373행 및 기존 두 실패 블록의 실행 range가 모두 covered=yes임을 확인했다.
+- 제품 파일 53개 SHA256 불변, git diff --check 통과. TC-12 및 전체 TC-01~19 실행에 포함되며 전체 UI 시험 자체는 재실행하지 않았다.
+
 ## 코덱 파라미터 복사 실패 검토
 
 - 사용자 요청은 parameters_copy 실패 블록 검토다. 제품 및 시뮬레이터 코드 수정 없이 구현과 커버리지를 확인한다.

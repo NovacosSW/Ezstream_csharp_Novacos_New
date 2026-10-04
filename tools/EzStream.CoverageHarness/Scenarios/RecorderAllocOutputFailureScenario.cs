@@ -1,4 +1,4 @@
-// 출력 컨텍스트 및 스트림 생성 실패를 주입해 오류 알림과 부분 생성 자원의 정리를 검증한다.
+// 출력 컨텍스트·스트림 생성·코덱 복사 실패를 주입해 오류 알림과 자원 정리를 검증한다.
 using System.Reflection;
 using System.Runtime.InteropServices;
 using EzStream.Core.Config;
@@ -13,6 +13,8 @@ namespace EzStream.CoverageHarness.Scenarios;
 
 internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
 {
+    internal enum Failure { Allocation, NewStream, ParametersCopy }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate AVStream* NewStream(AVFormatContext* context, AVCodec* codec);
 
@@ -22,8 +24,9 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
     private int _errorLogs;
     private string? _loggedError;
 
-    public static bool Run(bool failNewStream = false)
+    public static bool Run(Failure failure = Failure.Allocation)
     {
+        var failNewStream = failure == Failure.NewStream;
         var root = Path.Combine(Path.GetTempPath(), "ezstream-alloc-output-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         nint library = 0;
@@ -40,7 +43,12 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
                 scenario._nativeNewStream = Marshal.GetDelegateForFunctionPointer<NewStream>(
                     NativeLibrary.GetExport(library, "avformat_new_stream"));
             }
-            var bindingName = failNewStream ? "avformat_new_stream_fptr" : "avformat_alloc_output_context2_fptr";
+            var bindingName = failure switch
+            {
+                Failure.NewStream => "avformat_new_stream_fptr",
+                Failure.ParametersCopy => "avcodec_parameters_copy_fptr",
+                _ => "avformat_alloc_output_context2_fptr",
+            };
             var binding = typeof(ffmpeg).GetField(bindingName, BindingFlags.Static | BindingFlags.NonPublic)
                 ?? throw new MissingFieldException(bindingName);
             var original = binding.GetValue(null);
@@ -51,7 +59,12 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
             scenario._recorder = recorder;
             try
             {
-                var methodName = failNewStream ? nameof(FailSecondStream) : nameof(FailAllocation);
+                var methodName = failure switch
+                {
+                    Failure.NewStream => nameof(FailSecondStream),
+                    Failure.ParametersCopy => nameof(FailParametersCopy),
+                    _ => nameof(FailAllocation),
+                };
                 var method = typeof(RecorderAllocOutputFailureScenario).GetMethod(methodName,
                     BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(methodName);
                 binding.SetValue(null, Delegate.CreateDelegate(binding.FieldType, scenario, method));
@@ -61,10 +74,16 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
                 run.Invoke(recorder, null);
                 var status = recorder.Snapshot();
                 var error = FfmpegLoader.ErrorString(ffmpeg.AVERROR(ffmpeg.ENOMEM));
+                var expectedError = failure switch
+                {
+                    Failure.NewStream => "new_stream failed",
+                    Failure.ParametersCopy => "parameters_copy: " + error,
+                    _ => "alloc_output: " + error,
+                };
                 Require(scenario._calls == (failNewStream ? 2 : 1)
-                    && status.LastError == (failNewStream ? "new_stream failed" : "alloc_output: " + error),
+                    && status.LastError == expectedError,
                     "출력 준비 실패 상태를 확인하지 못했습니다.");
-                if (!failNewStream)
+                if (failure == Failure.Allocation)
                     Require(scenario._errorLogs == 1 && scenario._loggedError?.Contains(error, StringComparison.Ordinal) == true,
                         "출력 컨텍스트 할당 실패 로그를 확인하지 못했습니다.");
                 Require(notices.Count == 1 && !notices[0].Success && notices[0].FileSizeBytes == 0
@@ -91,6 +110,25 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
             if (library != 0) NativeLibrary.Free(library);
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    private int FailParametersCopy(AVCodecParameters* destination, AVCodecParameters* source)
+    {
+        Field("_running").SetValue(_recorder, false);
+        var output = (AVFormatContext*)Pointer.Unbox(Field("_oc").GetValue(_recorder)!);
+        var input = (AVFormatContext*)Pointer.Unbox(Field("_ic").GetValue(_recorder)!);
+        Require(output != null && output->nb_streams == 1 && input != null && input->nb_streams > 0
+            && destination != null && destination == output->streams[0]->codecpar
+            && source != null && source == input->streams[0]->codecpar
+            && source->codec_type == AVMediaType.AVMEDIA_TYPE_VIDEO,
+            "실제 출력 스트림 생성 이후의 코덱 복사 호출이 아닙니다.");
+        Require(destination->extradata == null, "새 출력 스트림에 예상하지 않은 추가 데이터가 있습니다.");
+        _calls++;
+        // FFmpeg 4.4의 실패 직후 상태를 모사하며 원본 extradata 소유권은 복사하지 않는다.
+        *destination = *source;
+        destination->extradata = null;
+        destination->extradata_size = 0;
+        return ffmpeg.AVERROR(ffmpeg.ENOMEM);
     }
 
     private AVStream* FailSecondStream(AVFormatContext* context, AVCodec* codec)
