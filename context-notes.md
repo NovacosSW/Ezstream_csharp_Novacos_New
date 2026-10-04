@@ -33,3 +33,18 @@ Core 테스트 부족보다 DLL/PDB 불일치에 따른 주 세션 계측 누락
 Service/Tray/Harness를 같은 빌드에서 생성하고 Core DLL/PDB를 함께 배포한 뒤 기존 수집 세션을 종료하고 새 회차로 전체 시험을 실행해야 한다. 기존 결과를 다시 병합해도 기록되지 않은 실행 정보는 복구되지 않는다.
 
 요청 범위는 조사이므로 제품 소스, 원본 실행 파일, 기존 커버리지 및 사용자 수정 `EzStream.sln`을 변경하지 않았다. 전체 시뮬레이터 재시험이나 산출물 복구는 수행하지 않았다. 불일치 파일이 생긴 구체적인 과거 복사/빌드 작업까지는 확인할 수 없다.
+
+## 후속 빌드 시작
+
+- 사용자가 빌드를 요청하여 기존 Debug 개발 실행 경로를 Rebuild한다. Harness 프로젝트 참조로 Core/Service/Tray를 함께 빌드하며 공유 출력 경로 충돌 방지를 위해 빌드 명령을 순서대로 실행한다.
+- 시작 시 실행 중인 EzStream 프로세스는 없었다. 기존 결과 파일은 보존하고 검증 결과는 별도 artifacts 경로에 저장한다.
+
+## 후속 빌드 검증 결과
+
+- 최초 제한 환경 빌드는 Windows SDK 경로 접근 거부로 실패했고, 권한 확장 후 `--no-restore` 빌드는 기존 NuGet 자산의 패키지 누락으로 실패했다. 복원을 포함한 아래 명령으로 해결했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug -t:Rebuild` 성공. Core/Service/Tray/Harness 모두 생성, 경고 0개 및 오류 0개.
+- `dotnet build tools/EzStream.CoverageTool/EzStream.CoverageTool.csproj -c Debug -t:Rebuild` 성공. 경고 0개 및 오류 0개.
+- `dotnet test tests/EzStream.Core.Tests/EzStream.Core.Tests.csproj -c Debug` 성공. 통과 28개, 실패 0개, 건너뜀 0개.
+- Service/Tray/Harness의 Core DLL/PDB GUID가 모두 `4a850fd2-875c-43e4-af4c-1dbede7f4d65`로 일치하고 DLL/PDB 각각의 SHA256도 세 폴더에서 동일하다. 증거는 `artifacts/core-coverage-rebuild/symbol-check.json`이다.
+- `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/core-coverage-rebuild/retention.xml -f xml tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RETENTION_ZERO` 성공. Core 6개 블록 수집을 확인했다. 0.44%는 이 최소 시나리오만의 값이다.
+- 실행 파일은 `tools/EzStream.CoverageTool/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageTool.exe`이다. 기존 deliverables/ZIP은 이번 개발 빌드 대상이 아니다. 전체 시뮬레이터 시험은 아직 실행하지 않았으며 새로 빌드된 도구에서 새 전체시험 회차로 진행해야 한다.

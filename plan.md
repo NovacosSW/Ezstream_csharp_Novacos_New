@@ -7,3 +7,10 @@
 3. 가능한 최소 재현으로 수집 동작을 검증하고 원인과 한계를 기록한다.
 
 사용자가 변경한 `EzStream.sln`은 유지한다.
+
+## 후속 빌드
+
+사용자의 빌드 요청에 따라 Debug 개발 실행 경로를 다시 생성한다.
+1. Harness 프로젝트와 참조 Core/Service/Tray를 Rebuild하고 CoverageTool도 Rebuild한다.
+2. Service/Tray/Harness의 Core DLL/PDB 식별자와 해시 일치를 확인한다.
+3. Core 단위 테스트와 새 세션의 최소 커버리지 수집을 검증한다.

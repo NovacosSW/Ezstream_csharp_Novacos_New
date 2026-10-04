@@ -5,3 +5,10 @@
 - [x] 기존 결과 및 배포 DLL/PDB 확인.
 - [x] 최소 재현 또는 관련 검증 실행.
 - [x] 원인과 검증 한계 기록.
+
+## 후속 빌드
+
+- [x] Harness 및 참조 프로젝트와 CoverageTool Debug Rebuild.
+- [x] Core DLL/PDB 식별자 및 실행 폴더 간 해시 일치 확인.
+- [x] Core 테스트와 최소 커버리지 수집 검증.
+- [x] 결과 및 실행 경로 기록.
