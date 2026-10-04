@@ -1,5 +1,9 @@
 # Core 동적 검사 조사 계획
 
+## SourceRecorder 패킷 재시도 검토
+
+RunOnce의 두 unref/continue 블록을 결과.xml과 구분하고, 미달성 EAGAIN 분기의 FFmpeg 4.4 반환 조건과 입력 설정을 대조한다. 발생 가능성, 재현 전략 및 제외 타당성을 검토하며 제품 코드는 변경하지 않는다.
+
 시뮬레이터는 `tools/EzStream.CoverageTool`을 의미한다고 가정한다. Core의 결과가 적은 원인을 실행 경로, 수집 설정, 배포 파일 및 기존 결과로 구분해 조사한다. 현재 요청은 원인 조사이며 근거 없이 제품 코드를 변경하지 않는다.
 
 1. Service/Tray/Core 실행 및 결과 병합 경로를 비교한다.

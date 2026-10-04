@@ -1,5 +1,24 @@
 # 조사 맥락
 
+## SourceRecorder 패킷 재시도 검토 시작
+
+- 사용자 인용 블록은 RunOnce에 두 번 있다. 결과.xml에서 EAGAIN 블록(185~187행)은 미달성, outIdx < 0 블록(201~203행)은 달성이다. 따라서 EAGAIN을 주 대상으로 검토하고 둘의 차이를 설명한다.
+- SourceRecorder.cs 체크섬은 결과.xml과 일치한다. 시작 시 EzStream.sln 및 FfmpegLoader.cs에 사용자 변경이 있어 보존한다.
+
+## SourceRecorder 패킷 재시도 검토 결과
+
+- XML 파싱 결과 RunOnce 블록 60/67(89.55%). EAGAIN 분기의 185~187행은 미달성이고 outIdx < 0의 201~203행은 달성이다. SourceRecorder SHA256은 `7903322A1214FDC1E59B5B21B14E9500A46EB377FDF7B9F04F34487CDB0FB108`로 XML과 일치한다.
+- av_read_frame의 EAGAIN은 C# 예외가 아니라 현재 패킷을 반환하지 못했으니 다시 시도하라는 음수 반환값이다. continue가 이를 일반 ret < 0 처리와 구분한다. 블록 전체를 삭제하면 일시적 상태를 입력 종료/오류로 처리하여 출력 종료 및 재접속 백오프로 넘어갈 수 있다.
+- FFmpeg 4.4 utils.c의 ff_read_packet/read_frame_internal/av_read_frame는 EAGAIN 반환을 전파하는 경로가 있다. 해당 값은 허용되는 API 결과이므로 null 버퍼 분기와 같은 논리적 도달 불가로 판단할 수 없다.
+- OpenInput은 AVFMT_FLAG_NONBLOCK을 설정하지 않으며 rtsp는 TCP, rtspu 접두사는 UDP 옵션을 지정한다. 파일 입력 및 현재 기본 설정에서 EAGAIN이 자주 반환될 것으로 단정할 근거는 없다. 네트워크 지연이 FFmpeg 내부 재시도나 타임아웃으로 처리될 수 있어 송신 지연만으로 이 C# 분기가 달성된다고 보장할 수 없다. FFmpeg 내부 EAGAIN과 av_read_frame 외부 반환은 구분해야 한다.
+- av_packet_unref는 패킷 참조/내용을 정리하고 재사용 가능한 상태로 돌리는 호출이며 pkt 객체 자체는 finally의 av_packet_free에서 해제한다. FFmpeg 내부도 오류 반환 전에 패킷을 정리하는 경로가 있으므로 이 한 호출을 제거하면 반드시 누수한다고 주장하지 않는다. 핵심은 EAGAIN 재시도 의미를 보존하는 것이다.
+- 재현 전략은 실제 지원 입력에서 av_read_frame 반환값을 관측하는 통합 시험 또는 시험용 읽기 호출 대체로 EAGAIN을 한 번 반환한 뒤 정상 읽기를 계속하는 오류 주입 시험이다. 후자는 재시도 동작 검증이지 실제 카메라가 그 상태를 생성함을 증명하는 시험은 아니다. 현재 시뮬레이터에는 해당 강제 반환 시험이 없고 이번 검토에서는 새 재현을 실행하지 않았다.
+- 권장 사항은 분기 유지 및 시험 보완이다. 현 자료만으로 검사 제외를 권장하지 않는다. 특정 지원 프로토콜·FFmpeg 빌드에서 외부 EAGAIN 반환이 불가능함을 입증한 경우에만 한정된 제외 근거를 검토할 수 있다. 운영 통계가 없어 발생 확률 수치는 제시하지 않는다.
+- 수행 검증은 XML/소스 체크섬, 코드 및 FFmpeg 4.4 공식 소스 대조다. 제품 코드를 변경하지 않아 새 빌드/테스트는 실행하지 않았다.
+- 공식 근거.
+  - https://github.com/FFmpeg/FFmpeg/blob/n4.4/libavformat/utils.c
+  - https://ffmpeg.org/doxygen/4.4/rtsp_8c_source.html
+
 ## FFmpeg null 조건 제거 시작
 
 - 사용자가 검토된 변경을 승인했다. 로그 변환의 ?.만 !.로 바꾸고 빈 문자열 처리는 유지한다. 기존 사용자 EzStream.sln 변경을 보존한다.
