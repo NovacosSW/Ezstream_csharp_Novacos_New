@@ -1,5 +1,15 @@
 # 조사 맥락
 
+## WritePacket 출력 쓰기 실패 검토
+
+- 요청은 av_interleaved_write_frame 음수 반환 처리 검토다. 제품 및 시뮬레이터 코드는 수정하지 않는다.
+- ret<0은 FFmpeg 쓰기 실패를 처리하는 정상 오류 경로다. https://ffmpeg.org/doxygen/4.4/group__lavf__encoding.html 의 함수 계약은 음수 AVERROR와 실패 시에도 패킷 해제를 명시한다. 입력 준비 단계는 저장장치 I/O 실패나 패킷 간 DTS 증가 조건까지 보장하지 않는다. PreparePacketForOutput은 단일 패킷 내 PTS/DTS 관계를 보정하지만 이전 패킷과의 DTS 순서를 비교하지 않는다. 운영 확률은 측정 근거가 없다.
+- 이벤트 36 Warning을 기록하고 세그먼트 첫 쓰기 오류만 ??=로 보존한다. return은 실패 호출의 패킷 크기를 RecordedBytes에 더하지 않도록 하며, RunOnce는 unref 후 다음 패킷으로 진행한다. 즉시 녹화 중단·재연결·같은 패킷 재시도는 하지 않는다. 버퍼링 함수이므로 오류 반환이 해당 패킷만 전혀 기록되지 않았다는 보장은 아니다.
+- CloseOutput은 _segmentWriteError로 closeError를 시작하므로 이후 쓰기가 성공해도 해당 세그먼트는 실패 보고된다. 단, 뒤 트레일러 오류가 발생하면 write_trailer로 덮어쓰며 avio_close 및 file_info 오류는 기존 원인을 유지한다. 상태 LastError를 이 분기에서 직접 갱신하지 않는다. 지속 I/O 장애에서 같은 세그먼트에 쓰기 시도와 경고가 반복될 수 있다는 동작 한계가 있다.
+- 결과.xml 및 최근 artifacts/missing-timestamp-integration/result.xml에서 526~530행 미실행. 기존 ServiceCoverageScenarios의 WriteFrameFailed 직접 호출은 로거만 실행하므로 이 분기를 검증하지 않는다.
+- 본 코드 변경 없이 시험용 av_interleaved_write_frame 바인딩에서 대상 패킷을 unref하고 음수 반환을 주입해 조건을 만들 수 있다. 서로 다른 오류를 2회 주입하면 ??= 첫 대입·기존 값 보존을 함께 확인할 수 있다. 이후 정상 쓰기를 원래 네이티브 함수로 전달하여 후속 녹화, 성공 패킷 바이트 합계, 이벤트 36, 실패 저장 알림, 자원 정리·바인딩 복원을 검증한다. TC-11 기존 출력 실패·종료 보고 시험 옆에 추가하는 것이 적절하다. 이는 실패 반환 처리 시험이며 실제 저장장치 장애나 부분 기록 재현은 아니다.
+- 검토 결론은 유지·시험 권장이고 도달 불가능 제외 대상이 아니다. 소스 및 두 XML 파싱과 FFmpeg 계약을 확인했으며 새 시험·빌드는 수행하지 않았다. 문서 변경은 git diff --check로 검증한다.
+
 ## TC-15 WritePacket 누락 타임스탬프 반환 시험 구현
 
 - 사용자 승인에 따라 기존 읽기 오류 시나리오를 재사용해 TC-15에 실제 RunOnce 시험을 추가한다. TC-14 기본 모드는 유지하고 TC-15에서만 유효 인덱스 패킷 하나의 PTS/DTS를 제거한다. 본 코드는 수정하지 않는다.
