@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## 절단 후 출력 열기 실패 시험 구현
+
+- 사용자 승인에 따라 TC-11 기존 절단 시험을 확장한다. 시험 프로세스에서만 avio_open 바인딩을 교체하며 두 번째 호출에 오류를 반환한다. 본 코드와 기존 사용자 변경은 유지한다.
+- RECORDER_CUT_CONDITIONS에 세 번째 모드를 추가했다. 첫 avio_open은 네이티브 함수로 성공시키고 두 번째에 AVERROR_EXTERNAL을 반환한다. 바인딩은 finally에서 복원한다. 사용 버전에 EACCES 상수가 없어 최초 빌드가 실패했고, 제공되는 AVERROR_EXTERNAL로 수정했다.
+- 실패 시 출력 열기 2회/패킷 읽기 5회로 중단됨, CurrentFile=null, LastError의 avio_open 오류, 정상 종료 알림 1개와 출력 실패 알림 1개, 이전 MP4의 4패킷 재읽기를 검증한다. 기존 시간 만료/주기 변경 정상 절단 모드도 함께 실행한다. 서비스의 2초 재시도 루프 자체는 이 RunOnce 시험 범위가 아니다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션의 CoverageTool 빌드 성공. 최종 경고/오류 0개.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RECORDER_CUT_CONDITIONS` 성공. artifacts/cut-failure-integration/result.xml에서 RunOnce 211/219/220/221/222행 모든 range가 covered=yes임을 검사했다.
+- 제품 파일 53개의 SHA256 불변 및 git diff --check 통과. TC-11 및 이를 포함한 전체 UI 시험에 연결되어 있으며 전체 UI 시험 자체는 재실행하지 않았다.
+
 ## 절단 후 새 출력 열기 실패 검토
 
 - 사용자 요청은 절단 후 OpenNewSegment 실패 처리 검토다. 코드 변경이나 새 시험 구현 없이 실패 경로와 재현 방안을 확인한다.

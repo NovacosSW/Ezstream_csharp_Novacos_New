@@ -1,4 +1,4 @@
-// 실제 두 비디오 입력과 시험용 패킷 플래그로 절단 요청·보류·키프레임 절단을 검증한다.
+// 실제 두 비디오 입력과 시험용 바인딩으로 절단 조건과 새 출력 열기 실패를 검증한다.
 using System.Reflection;
 using System.Runtime.InteropServices;
 using EzStream.Core.Config;
@@ -16,15 +16,20 @@ internal sealed unsafe class RecorderCutCoverageScenario
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int ReadFrame(AVFormatContext* context, AVPacket* packet);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int OpenOutput(AVIOContext** context, [MarshalAs(UnmanagedType.LPUTF8Str)] string url, int flags);
+
     private readonly ReadFrame _nativeRead;
     private readonly SourceRecorder _recorder;
     private readonly bool _scheduled;
+    private readonly OpenOutput _nativeOpen;
+    private int _opens;
     private int _reads;
     private string? _firstFile;
     private string? _secondFile;
 
-    private RecorderCutCoverageScenario(ReadFrame nativeRead, SourceRecorder recorder, bool scheduled)
-        => (_nativeRead, _recorder, _scheduled) = (nativeRead, recorder, scheduled);
+    private RecorderCutCoverageScenario(ReadFrame nativeRead, OpenOutput nativeOpen, SourceRecorder recorder, bool scheduled)
+        => (_nativeRead, _nativeOpen, _recorder, _scheduled) = (nativeRead, nativeOpen, recorder, scheduled);
 
     public static string Run()
     {
@@ -38,48 +43,87 @@ internal sealed unsafe class RecorderCutCoverageScenario
             FfmpegLoader.Initialize(nativeDirectory, "warning", NullLogger.Instance);
             var binding = typeof(ffmpeg).GetField("av_read_frame_fptr", BindingFlags.Static | BindingFlags.NonPublic)
                 ?? throw new MissingFieldException("av_read_frame_fptr");
+            var openBinding = typeof(ffmpeg).GetField("avio_open_fptr", BindingFlags.Static | BindingFlags.NonPublic)
+                ?? throw new MissingFieldException("avio_open_fptr");
             var library = NativeLibrary.Load(Path.Combine(nativeDirectory, "avformat-58.dll"));
             try
             {
                 var nativeRead = Marshal.GetDelegateForFunctionPointer<ReadFrame>(
                     NativeLibrary.GetExport(library, "av_read_frame"));
-                foreach (var scheduled in new[] { false, true })
+                var nativeOpen = Marshal.GetDelegateForFunctionPointer<OpenOutput>(
+                    NativeLibrary.GetExport(library, "avio_open"));
+                foreach (var mode in new[] { (Scheduled: false, FailOpen: false), (Scheduled: true, FailOpen: false), (Scheduled: false, FailOpen: true) })
                 {
                     var original = binding.GetValue(null);
+                    var originalOpen = openBinding.GetValue(null);
                     var notices = new List<VideoSaveNotification>();
                     var recorder = new SourceRecorder(
-                        new SourceConfig { Url = new Uri(input), Path = scheduled ? "scheduled" : "requested", FilePrefix = "cut" },
+                        new SourceConfig { Url = new Uri(input), Path = mode.FailOpen ? "open-failure" : mode.Scheduled ? "scheduled" : "requested", FilePrefix = "cut" },
                         new RecorderConfig { DocumentRoot = root, SegmentMinutes = 1 },
                         NullLogger.Instance, notices.Add);
-                    var scenario = new RecorderCutCoverageScenario(nativeRead, recorder, scheduled);
+                    var scenario = new RecorderCutCoverageScenario(nativeRead, nativeOpen, recorder, mode.Scheduled);
                     try
                     {
                         var method = typeof(RecorderCutCoverageScenario).GetMethod(nameof(ReadControlled),
                             BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(nameof(ReadControlled));
                         binding.SetValue(null, Delegate.CreateDelegate(binding.FieldType, scenario, method));
+                        if (mode.FailOpen)
+                        {
+                            var openMethod = typeof(RecorderCutCoverageScenario).GetMethod(nameof(OpenControlled),
+                                BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(nameof(OpenControlled));
+                            openBinding.SetValue(null, Delegate.CreateDelegate(openBinding.FieldType, scenario, openMethod));
+                        }
                         SetField(recorder, "_running", true);
                         Invoke(recorder, "RunOnce");
-                        Require(scenario._reads == 6 && notices.Count == 1,
-                            "주 비디오 키프레임에서 정확히 한 번 절단되지 않았습니다.");
+                        if (mode.FailOpen)
+                        {
+                            var status = recorder.Snapshot();
+                            Require(scenario._opens == 2 && scenario._reads == 5 && notices.Count == 2,
+                                "두 번째 출력 실패 후 패킷 처리가 중단되지 않았습니다.");
+                            Require(status.CurrentFile is null && status.LastError?.StartsWith("avio_open:", StringComparison.Ordinal) == true,
+                                "새 출력 열기 실패 상태가 기록되지 않았습니다.");
+                        }
+                        else
+                        {
+                            Require(scenario._reads == 6 && notices.Count == 1,
+                                "주 비디오 키프레임에서 정확히 한 번 절단되지 않았습니다.");
+                        }
                     }
                     finally
                     {
                         binding.SetValue(null, original);
+                        if (mode.FailOpen) openBinding.SetValue(null, originalOpen);
                         recorder.Stop();
                         try { Invoke(recorder, "CloseOutput", true); }
                         finally { Invoke(recorder, "CloseInput"); }
                     }
                     Require(ReferenceEquals(binding.GetValue(null), original), "읽기 바인딩 복원 실패");
-                    Require(notices.Count == 2 && notices.All(n => n.Success && n.FileSizeBytes > 0),
-                        "두 세그먼트의 저장 완료를 확인하지 못했습니다.");
-                    Require(CountPackets(scenario._firstFile!) == 4 && CountPackets(scenario._secondFile!) == 1,
-                        "절단 전후 MP4의 패킷 수가 예상과 다릅니다.");
+                    Require(notices.Count == 2 && notices[0].Success && notices[0].FileSizeBytes > 0
+                        && CountPackets(scenario._firstFile!) == 4, "이전 MP4의 정상 저장을 확인하지 못했습니다.");
+                    if (mode.FailOpen)
+                    {
+                        Require(ReferenceEquals(openBinding.GetValue(null), originalOpen), "출력 열기 바인딩 복원 실패");
+                        Require(!notices[1].Success && notices[1].FileSizeBytes == 0
+                            && notices[1].Error?.StartsWith("avio_open:", StringComparison.Ordinal) == true,
+                            "새 출력 열기 실패 알림이 예상과 다릅니다.");
+                    }
+                    else
+                    {
+                        Require(notices[1].Success && notices[1].FileSizeBytes > 0 && CountPackets(scenario._secondFile!) == 1,
+                            "새 MP4의 정상 저장을 확인하지 못했습니다.");
+                    }
                 }
             }
             finally { NativeLibrary.Free(library); }
-            return "시간 만료·주기 변경 및 비키프레임·두 번째 비디오 절단 보류 확인";
+            return "절단 조건 및 새 출력 열기 실패 후 패킷 처리 중단 확인";
         }
         finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private int OpenControlled(AVIOContext** context, string url, int flags)
+    {
+        _opens++;
+        return _opens == 2 ? ffmpeg.AVERROR_EXTERNAL : _nativeOpen(context, url, flags);
     }
 
     private int ReadControlled(AVFormatContext* context, AVPacket* packet)
