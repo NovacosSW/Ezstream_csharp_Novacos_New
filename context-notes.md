@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## 출력 컨텍스트 할당 실패 시험 구현
+
+- 사용자 승인에 따라 TC-12에 출력 컨텍스트 할당 실패 검사를 추가한다. 제품 코드와 기존 주석은 유지한다. 시험 프로세스에서만 함수 바인딩을 교체하며 실제 메모리를 고갈시키지 않는다.
+- RecorderAllocOutputFailureScenario를 추가하고 ALLOC_OUTPUT_FAILURE를 TC-12 기존 미지원 코덱 단계 다음에 연결했다. 실제 AVI 입력 준비 및 PREPARED 상태 후 할당 함수 인자를 확인하고 *context=null, AVERROR(ENOMEM)을 반환한다. 첫 실패 뒤 _running=false로 재시도만 중단하며 실제 Run의 finally를 실행한다.
+- LastError의 alloc_output 문자열, CannotAllocateOutput 이벤트 30 Error 로그 1회, 실패 저장 알림 1회 및 오류/파일 크기 0, MP4 미생성, STOPPED와 입출력 포인터 null, 입력 파일 배타적 재열기, 바인딩 복원을 검사했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션의 CoverageTool 빌드 성공. 모두 경고/오류 0개.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe ALLOC_OUTPUT_FAILURE` 통과. artifacts/alloc-output-integration/result.xml에서 OpenNewSegmentCore 339~344행의 모든 range가 covered=yes임을 확인했다.
+- 제품 소스 및 기존 제품 DLL/PDB 등 53개 SHA256 불변, git diff --check 통과. TC-12 및 전체 TC-01~19에 포함되지만 전체 UI 시험 자체는 재실행하지 않았다. 실제 메모리 고갈이나 2초 재시도는 검증하지 않았다.
+
 ## 출력 컨텍스트 할당 실패 검토
 
 - 사용자 요청은 OpenNewSegmentCore의 alloc_output 오류 블록 검토다. 제품 및 시뮬레이터 코드를 변경하지 않고 FFmpeg 실제 구현과 비교한다.

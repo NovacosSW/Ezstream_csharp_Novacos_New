@@ -37,6 +37,7 @@ internal static class Program
                 "MISSING_TIMESTAMP" => RecorderCoverageScenarios.RunMissingTimestamp(),
                 "INVALID_TIMESTAMP" => RunInvalidTimestamp(),
                 "STREAM_INFO_FAILURE" => RecorderStreamInfoFailureScenario.Run(),
+                "ALLOC_OUTPUT_FAILURE" => RecorderAllocOutputFailureScenario.Run(),
                 "SERVICE_LOG_LEVELS" => HasText(ServiceCoverageScenarios.RunServiceLogLevels()),
                 "RESIDUAL_BRANCHES" => HasText(ServiceCoverageScenarios.RunResidualBranches()),
                 "PIPE_ACCEPT_FAILURE" => HasText(ServiceCoverageScenarios.RunPipeAcceptFailure()),
