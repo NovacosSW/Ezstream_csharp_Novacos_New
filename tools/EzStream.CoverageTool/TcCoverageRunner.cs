@@ -131,7 +131,10 @@ internal sealed class TcCoverageRunner
                 Step("엔진 재시작", runner.RunEngineRestartTestAsync),
                 Step("녹화기 중복 시작·종료", CoverageTestRunner.RunRecorderLifecycleTestAsync),
                 Step("동일 세그먼트 주기", CoverageTestRunner.RunSameSegmentIntervalTestAsync),
-                Step("세그먼트 절단", runner.RunSegmentCutTestAsync)),
+                Step("세그먼트 절단", runner.RunSegmentCutTestAsync),
+                Step("시간 만료·키프레임 절단 조건", (progress, cancellationToken) =>
+                    HarnessCoverageRunner.RunAsync("RECORDER_CUT_CONDITIONS",
+                        "자동 절단·주기 변경·비키프레임 및 다른 비디오 절단 보류", progress, cancellationToken))),
             [12] = Plan("미지원 코덱 출력 실패",
                 Step("미지원 코덱", (progress, cancellationToken) =>
                     RunUnsupportedCodecWithFallbackAsync(runner, progress, cancellationToken))),

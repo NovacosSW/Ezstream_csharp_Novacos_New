@@ -1,5 +1,30 @@
 # 조사 맥락
 
+## 절단 조건 시험 구현
+
+- 사용자의 두 작업 진행 요청을 받아 시뮬레이터 시험을 추가한다. 단일 조건 수집 제외는 현재 설정에 없으므로 제품 유지 및 사유 문서화와 제품 조건 제거 중 선택을 비동기 질문했다. 답변 전 제품 코드는 수정하지 않는다.
+- 사용자 답변은 시뮬레이터 수정과 제외 검토 사유 정리이며, 제품의 조건 삭제가 아니다. 제품과 수집 설정은 유지한다.
+
+### 검사 제외 검토서 — 비디오가 없는 경우의 절단 허용 분기
+
+- 대상은 src/EzStream.Core/Recording/SourceRecorder.cs 212행 `_videoInputIndex < 0` 비교 결과가 참인 분기만이다. 전체 canCut 식, 비교 결과가 거짓인 분기, `isVideo && isKey`는 제외 대상이 아니다.
+- 전제는 현재 비디오 전용 출력 정책과 정상 녹화기 수명주기이다. OpenInput 278~283행에서 첫 비디오 인덱스를 설정한다. OpenNewSegmentCore 348~376행은 비디오만 출력 매핑에 등록하며, 등록 개수가 0이면 379~385행에서 실패한다. RunOnce 174행은 해당 실패 시 반환한다. 따라서 비디오가 없으면 212행에 도달하지 않는다.
+- CloseInput은 비디오 인덱스를 -1로 되돌리지만 정상 실행에서 RunOnce 종료 후 정리 과정에 호출된다. 현재 정상 호출 경로에 녹화 중 인덱스를 -1로 바꾸는 동작은 없다.
+- 판정은 현 구현에서 정상 도달 불가능한 참 분기에 대한 검사 제외 검토 대상으로 분류한다. 억지로 private 필드를 -1로 바꾸어 실행률을 채우는 시험은 추가하지 않는다.
+- 관리 방식은 원본 coverage/XML을 보존하고 이 사유를 검토 근거로 첨부하는 것이다. 현재 수집 설정으로 한 식 안의 특정 분기만 제외하도록 구현하지 않았으며, 코드나 XML을 고쳐 달성으로 표시하지 않는다. 따라서 212행 partial은 남는다.
+- 오디오 출력 지원, 매핑 정책 변경, 녹화 중 비디오 인덱스 갱신 또는 수명주기 변경 시 이 판정을 재검토해야 한다.
+
+### 절단 조건 시험 검증
+
+- TC-11의 기존 세그먼트 절단 시험 다음에 RECORDER_CUT_CONDITIONS를 연결했다. 전체 TC-01~19 실행에도 포함된다.
+- 두 개의 실제 비디오 스트림을 가진 AVI를 만들고 원본 네이티브 읽기를 사용한다. 주 비디오 비키프레임 경로는 시험 프로세스에서 KEY 플래그만 지우는 제어 시험이며 실제 압축 영상 GOP 검증은 아니다.
+- 요청 절단은 공개 UpdateSegmentMinutes(120000)를 호출한다. 자동 절단은 첫 패킷 기록 후 시험 프로세스의 _segmentMillis만 1000으로 단축하고 1200ms를 기다리며 _cutNow를 설정하지 않는다. 제품 소스 변경 없이 시간 비교 경로를 검증한다.
+- 각 모드에서 첫 패킷 정상 기록, 두 번째 비디오 키프레임·주 비디오 비키프레임·두 번째 비디오 키프레임 보류, 주 비디오 키프레임에서 절단을 확인한다. 저장 알림 2개 성공 및 이전 MP4 4패킷/다음 MP4 1패킷 재읽기를 확인한다.
+- 초기 실행에서 MP4 재읽기가 FFmpeg의 지연 바인딩을 초기화하여 마지막 복원 비교가 실패했다. 각 모드의 복원 직후, 재읽기 전에 원래 바인딩과 비교하도록 고쳤다. CA1303이 발생한 불필요한 직접 진단 출력도 제거했다.
+- 최종 `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션의 CoverageTool 빌드는 경고/오류 0개로 성공했다.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RECORDER_CUT_CONDITIONS` 최종 통과. 공유 AVI 생성기의 기존 RECORDER_EAGAIN 시험도 통과했다.
+- artifacts/cut-integration/final.xml에서 210/211/213~218행 covered=yes, 212행 covered=partial을 확인했다. 제품 소스와 기존 제품 DLL/PDB 등 53개 SHA256은 변경 전과 같다. git diff --check 통과. 전체 UI 시험 자체는 재실행하지 않았다.
+
 ## 세그먼트 절단 조건 검토 시작
 
 - wantCut과 canCut 검토 요청이며 제품 또는 시뮬레이터 수정은 하지 않는다. 결과.xml에서 211/212행 partial, 절단 본문 214~219행 yes를 확인했다.

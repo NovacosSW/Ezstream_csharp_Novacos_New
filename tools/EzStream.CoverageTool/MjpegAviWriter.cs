@@ -22,6 +22,57 @@ internal static class MjpegAviWriter
         Create(path, LongFrameCount);
     }
 
+    public static void CreateWithTwoVideos(string path)
+    {
+        var frames = CreateFrames(FrameCount);
+        try
+        {
+            using var stream = File.Create(path);
+            using var writer = new BinaryWriter(stream);
+            var riff = BeginContainer(writer, "RIFF", "AVI ");
+            var header = BeginContainer(writer, "LIST", "hdrl");
+            WriteMainHeader(writer, frames, streamCount: 2);
+            for (var index = 0; index < 2; index++)
+            {
+                var video = BeginContainer(writer, "LIST", "strl");
+                WriteStreamHeader(writer, frames);
+                WriteBitmapHeader(writer, frames);
+                EndContainer(writer, video);
+            }
+            EndContainer(writer, header);
+            var movie = BeginContainer(writer, "LIST", "movi");
+            var entries = new List<AviIndexEntry>();
+            foreach (var frame in frames)
+            {
+                foreach (var chunk in new[] { "00dc", "01dc" })
+                {
+                    entries.Add(new AviIndexEntry(chunk,
+                        checked((int)(stream.Position - movie.DataStart)), checked((int)frame.Length)));
+                    WriteFourCc(writer, chunk);
+                    writer.Write(checked((int)frame.Length));
+                    frame.Position = 0;
+                    frame.CopyTo(stream);
+                    if ((frame.Length & 1) != 0) writer.Write((byte)0);
+                }
+            }
+            EndContainer(writer, movie);
+            WriteFourCc(writer, "idx1");
+            writer.Write(checked(entries.Count * 16));
+            foreach (var entry in entries)
+            {
+                WriteFourCc(writer, entry.ChunkId);
+                writer.Write(0x10);
+                writer.Write(entry.Offset);
+                writer.Write(entry.Length);
+            }
+            EndContainer(writer, riff);
+        }
+        finally
+        {
+            foreach (var frame in frames) frame.Dispose();
+        }
+    }
+
     public static void CreateWithAudio(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

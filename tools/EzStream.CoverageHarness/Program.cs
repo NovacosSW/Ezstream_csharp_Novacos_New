@@ -47,6 +47,7 @@ internal static class Program
                 "RETENTION_MISSING_PATHS" => RecorderCoverageScenarios.RunRetentionMissingPaths(),
                 "RECORDER_LIFECYCLE" => RecorderCoverageScenarios.RunRecorderLifecycle(),
                 "RECORDER_EAGAIN" => HasText(RecorderEagainCoverageScenario.Run()),
+                "RECORDER_CUT_CONDITIONS" => HasText(RecorderCutCoverageScenario.Run()),
                 "SAME_SEGMENT_INTERVAL" => RecorderCoverageScenarios.RunSameSegmentInterval(),
                 "UNSUPPORTED_CODEC_HEADER" => RecorderCoverageScenarios.RunUnsupportedCodecHeader(),
                 "EMPTY_PIPE_RESPONSE" => RecorderCoverageScenarios.RunEmptyPipeResponse(),
