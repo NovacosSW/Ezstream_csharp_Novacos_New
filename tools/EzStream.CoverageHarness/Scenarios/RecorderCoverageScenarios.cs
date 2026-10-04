@@ -29,7 +29,8 @@ internal static class RecorderCoverageScenarios
         var segmentStart = long.MinValue;
         var timeBase = new AVRational { num = 1, den = 1000 };
         return !SourceRecorder.PreparePacketForOutput(
-            &packet, timeBase, timeBase, 0, ref segmentStart);
+            &packet, timeBase, timeBase, 0, ref segmentStart)
+            && !string.IsNullOrEmpty(RecorderEagainCoverageScenario.Run(missingTimestamp: true));
     }
 
     public static unsafe bool RunInvalidTimestampOrder()

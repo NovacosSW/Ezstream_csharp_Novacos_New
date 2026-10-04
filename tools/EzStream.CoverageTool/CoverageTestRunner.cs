@@ -427,7 +427,7 @@ internal sealed class CoverageTestRunner
         IProgress<string> progress,
         CancellationToken cancellationToken)
         => HarnessCoverageRunner.RunAsync(
-            "MISSING_TIMESTAMP", "PTS/DTS가 모두 없는 패킷 건너뛰기", progress, cancellationToken);
+            "MISSING_TIMESTAMP", "PTS/DTS 없는 패킷 제외·해제 및 후속 녹화", progress, cancellationToken);
 
     public static Task<TestResult> RunInvalidTimestampTestAsync(
         IProgress<string> progress,

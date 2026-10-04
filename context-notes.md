@@ -1,5 +1,13 @@
 # 조사 맥락
 
+## TC-15 WritePacket 누락 타임스탬프 반환 시험 구현
+
+- 사용자 승인에 따라 기존 읽기 오류 시나리오를 재사용해 TC-15에 실제 RunOnce 시험을 추가한다. TC-14 기본 모드는 유지하고 TC-15에서만 유효 인덱스 패킷 하나의 PTS/DTS를 제거한다. 본 코드는 수정하지 않는다.
+- RunMissingTimestamp의 기존 helper 직접 검사를 유지하고 실제 녹화 시나리오를 이어 실행한다. 기존 EAGAIN 1회·인덱스 오류 2회 이후 유효 비디오 패킷 하나의 PTS/DTS를 제거하며, 다음 읽기 진입에서 packet buf/data null 및 size 0을 확인한다. 허용한 패킷 크기 합계와 RecordedBytes, 종료 후 MP4 재읽기 패킷 수 및 바인딩 복원을 검증한다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool 동일 빌드가 각각 경고 0·오류 0으로 통과했다.
+- `dotnet-coverage connect <session> <Harness.exe> MISSING_TIMESTAMP`, `RECORDER_EAGAIN`, `INVALID_TIMESTAMP` 모두 OK. `artifacts/missing-timestamp-integration/result.xml`의 WritePacket 521행 covered=yes를 확인했다. 제품 소스·DLL·PDB 53개 SHA256 불변, git diff --check 통과. 루트 결과.xml은 보존했다.
+- 기존 TC-15 단계와 전체 TC01~19 경로에서 실행된다. 이번 검증은 위 세 Harness 명령이며 전체 UI 시험 버튼 자체는 실행하지 않았다. 시험 조건 주입은 실제 입력에서 누락 타임스탬프가 발생할 확률을 측정하는 것이 아니다.
+
 ## WritePacket 타임스탬프 누락 반환 검토
 
 - 이번 요청은 WritePacket의 PreparePacketForOutput 실패 시 return 검토이며 제품·시험 코드는 변경하지 않는다.

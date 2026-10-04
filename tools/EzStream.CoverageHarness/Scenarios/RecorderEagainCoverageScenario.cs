@@ -1,4 +1,4 @@
-// 시험 프로세스에서만 FFmpeg 읽기 바인딩을 교체해 EAGAIN과 잘못된 인덱스 이후 녹화 복구를 검증한다.
+// 시험용 읽기 바인딩으로 EAGAIN·인덱스 오류·타임스탬프 누락 이후 녹화 복구를 검증한다.
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -19,13 +19,18 @@ internal sealed unsafe class RecorderEagainCoverageScenario
     private delegate int ReadFrame(AVFormatContext* context, AVPacket* packet);
 
     private readonly ReadFrame _nativeRead;
+    private readonly bool _missingTimestamp;
+    private int _missingPackets;
+    private bool _checkReleasedPacket;
+    private long _expectedBytes;
     private int _injected;
     private int _invalidIndices;
     private int _packets;
 
-    private RecorderEagainCoverageScenario(ReadFrame nativeRead) => _nativeRead = nativeRead;
+    private RecorderEagainCoverageScenario(ReadFrame nativeRead, bool missingTimestamp)
+        => (_nativeRead, _missingTimestamp) = (nativeRead, missingTimestamp);
 
-    public static string Run()
+    public static string Run(bool missingTimestamp = false)
     {
         var root = Path.Combine(Path.GetTempPath(), "ezstream-eagain-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -43,7 +48,7 @@ internal sealed unsafe class RecorderEagainCoverageScenario
             {
                 var nativeRead = Marshal.GetDelegateForFunctionPointer<ReadFrame>(
                     NativeLibrary.GetExport(library, "av_read_frame"));
-                var scenario = new RecorderEagainCoverageScenario(nativeRead);
+                var scenario = new RecorderEagainCoverageScenario(nativeRead, missingTimestamp);
                 var recorder = new SourceRecorder(
                     new SourceConfig { Url = new Uri(input), Path = "recording", FilePrefix = "eagain" },
                     new RecorderConfig { DocumentRoot = root }, NullLogger.Instance);
@@ -63,6 +68,7 @@ internal sealed unsafe class RecorderEagainCoverageScenario
                     if (scenario._injected != 1 || scenario._invalidIndices != 2
                         || scenario._packets == 0 || status.RecordedBytes <= 0)
                         throw new InvalidOperationException("EAGAIN 및 인덱스 오류 이후 정상 패킷 기록을 확인하지 못했습니다.");
+                    scenario.VerifyRecordedBytes(status.RecordedBytes);
                 }
                 finally
                 {
@@ -77,8 +83,8 @@ internal sealed unsafe class RecorderEagainCoverageScenario
                 var savedPackets = CountSavedPackets(output
                     ?? throw new InvalidOperationException("저장된 MP4 경로가 없습니다."));
                 if (savedPackets != scenario._packets)
-                    throw new InvalidOperationException("잘못된 인덱스 패킷 제외 후 저장 MP4의 패킷 수가 일치하지 않습니다.");
-                return $"EAGAIN 1회·인덱스 오류 2회 후 {savedPackets}개 패킷 녹화·MP4 재읽기·바인딩 복원 확인";
+                    throw new InvalidOperationException("인덱스 오류·타임스탬프 누락 패킷 제외 후 저장 MP4의 패킷 수가 일치하지 않습니다.");
+                return $"EAGAIN 1회·인덱스 오류 2회·타임스탬프 누락 {scenario._missingPackets}회 후 {savedPackets}개 패킷 녹화·MP4 재읽기·바인딩 복원 확인";
             }
             finally
             {
@@ -93,6 +99,12 @@ internal sealed unsafe class RecorderEagainCoverageScenario
 
     private int ReadWithEagain(AVFormatContext* context, AVPacket* packet)
     {
+        if (_checkReleasedPacket)
+        {
+            if (packet->buf != null || packet->data != null || packet->size != 0)
+                throw new InvalidOperationException("타임스탬프 누락 패킷 참조가 해제되지 않았습니다.");
+            _checkReleasedPacket = false;
+        }
         if (_injected == 0)
         {
             _injected++;
@@ -107,12 +119,29 @@ internal sealed unsafe class RecorderEagainCoverageScenario
                 packet->stream_index = _invalidIndices == 0 ? -1 : checked((int)context->nb_streams);
                 _invalidIndices++;
             }
+            else if (_missingTimestamp && _missingPackets == 0)
+            {
+                if (packet->stream_index != 0 || packet->size <= 0)
+                    throw new InvalidOperationException("타임스탬프 제거 대상이 정상 비디오 패킷이 아닙니다.");
+                packet->pts = ffmpeg.AV_NOPTS_VALUE;
+                packet->dts = ffmpeg.AV_NOPTS_VALUE;
+                _missingPackets++;
+                _checkReleasedPacket = true;
+            }
             else
             {
                 _packets++;
+                _expectedBytes += packet->size;
             }
         }
         return result;
+    }
+
+    private void VerifyRecordedBytes(long recordedBytes)
+    {
+        if (_missingPackets != (_missingTimestamp ? 1 : 0) || _checkReleasedPacket
+            || recordedBytes != _expectedBytes)
+            throw new InvalidOperationException("누락 패킷 제외·참조 해제·정상 패킷 바이트 합계 검증 실패");
     }
 
     private static int CountSavedPackets(string path)
