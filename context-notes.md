@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## TC-11 패킷 쓰기 실패 시험 구현
+
+- 사용자 승인에 따라 시험용 쓰기 바인딩에서 두 패킷을 해제하고 서로 다른 음수 오류를 반환한다. 기존 절단 시험을 재사용해 이후 정상 패킷과 다음 세그먼트 저장을 확인한다. 제품 코드는 변경하지 않는다.
+- RecorderWriteFailureInjection은 쓰기 호출 2·3번째 패킷을 unref하고 각각 AVERROR_EXTERNAL·AVERROR_INVALIDDATA를 반환한다. 매 읽기/쓰기 시 RecordedBytes와 성공 패킷 크기 합계를 비교하며 세그먼트 변경 시 기대 합계도 초기화한다. Dispose에서 원래 쓰기 바인딩 복원을 검증한다.
+- RecorderCutCoverageScenario의 쓰기 실패 전용 모드는 요청 절단 시나리오만 실행한다. 첫 MP4는 2패킷이며 첫 write_frame 오류가 보존된 실패 알림을 확인한다. 이벤트 36 Warning 두 건의 각각 다른 오류 문자열을 검증하고, 두 번째 MP4 1패킷 정상 저장과 성공 알림, 입력/출력 컨텍스트 null·두 파일 독점 열기를 확인한다. TC-11 별도 단계 RECORDER_WRITE_FAILURE로 연결했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool 동일 빌드 모두 경고 0·오류 0으로 통과했다.
+- `dotnet-coverage connect <session> <Harness.exe> RECORDER_WRITE_FAILURE` 및 기존 5개 모드의 `RECORDER_CUT_CONDITIONS` 모두 OK. `artifacts/write-failure-integration/result.xml`에서 WritePacket 526~530행 전부 covered=yes 확인. 제품 소스·DLL·PDB 53개 SHA256 불변 및 git diff --check 통과. 루트 결과.xml은 보존했다.
+- TC-11이 전체 TC01~19에 포함되지만 전체 UI 시험 버튼 자체는 실행하지 않았다. 이 시험은 실패 반환·보고·후속 처리 검증이며 실제 저장장치 고장과 부분 기록 상태를 재현한 것은 아니다.
+
 ## WritePacket 출력 쓰기 실패 검토
 
 - 요청은 av_interleaved_write_frame 음수 반환 처리 검토다. 제품 및 시뮬레이터 코드는 수정하지 않는다.

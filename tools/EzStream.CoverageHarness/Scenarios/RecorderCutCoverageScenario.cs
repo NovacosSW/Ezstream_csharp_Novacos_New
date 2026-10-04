@@ -29,6 +29,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
     private readonly OpenOutput _nativeOpen;
     private readonly WriteTrailer _nativeTrailer;
     private InvalidOperationException? _trailerException;
+    private RecorderWriteFailureInjection? _writeFailure;
     private int _trailers;
     private int _opens;
     private int _reads;
@@ -38,7 +39,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
     private RecorderCutCoverageScenario(ReadFrame nativeRead, OpenOutput nativeOpen, WriteTrailer nativeTrailer, SourceRecorder recorder, bool scheduled)
         => (_nativeRead, _nativeOpen, _nativeTrailer, _recorder, _scheduled) = (nativeRead, nativeOpen, nativeTrailer, recorder, scheduled);
 
-    public static string Run()
+    public static string Run(bool failWrite = false)
     {
         var root = Path.Combine(Path.GetTempPath(), "ezstream-cut-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -70,7 +71,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     (Scheduled: false, FailOpen: true, FailTrailer: false, ThrowTrailer: false, Path: "open-failure"),
                     (Scheduled: false, FailOpen: false, FailTrailer: true, ThrowTrailer: false, Path: "trailer-failure"),
                     (Scheduled: false, FailOpen: false, FailTrailer: true, ThrowTrailer: true, Path: "trailer-exception"),
-                })
+                }.Take(failWrite ? 1 : 5))
                 {
                     var original = binding.GetValue(null);
                     var originalOpen = openBinding.GetValue(null);
@@ -82,6 +83,8 @@ internal sealed unsafe class RecorderCutCoverageScenario
                         new RecorderConfig { DocumentRoot = root, SegmentMinutes = 1 },
                         logger, notices.Add);
                     var scenario = new RecorderCutCoverageScenario(nativeRead, nativeOpen, nativeTrailer, recorder, mode.Scheduled);
+                    using var writeFailure = failWrite ? new RecorderWriteFailureInjection(recorder, library) : null;
+                    scenario._writeFailure = writeFailure;
                     if (mode.ThrowTrailer)
                         scenario._trailerException = new InvalidOperationException("coverage-trailer-managed-exception");
                     try
@@ -135,18 +138,20 @@ internal sealed unsafe class RecorderCutCoverageScenario
                 }
             }
             finally { NativeLibrary.Free(library); }
-            return "절단 조건·출력 열기 실패·트레일러 오류 반환 및 관리 예외 보고와 정리 확인";
+            return "절단 조건·출력 실패 보고와 정리 확인";
         }
         finally { Directory.Delete(root, recursive: true); }
     }
 
     private void VerifySavedSegments(List<VideoSaveNotification> notices, TrailerLogger logger, bool failOpen, bool failTrailer)
     {
-        Require(notices.Count == 2 && notices[0].Success == !failTrailer && notices[0].FileSizeBytes > 0
-            && CountPackets(_firstFile!) == 4, "이전 MP4의 정상 저장을 확인하지 못했습니다.");
-        if (failTrailer)
+        var failed = failTrailer || _writeFailure is not null;
+        Require(notices.Count == 2 && notices[0].Success == !failed && notices[0].FileSizeBytes > 0
+            && CountPackets(_firstFile!) == (_writeFailure is null ? 4 : 2), "이전 MP4의 저장 결과를 확인하지 못했습니다.");
+        if (failTrailer) VerifyTrailerFailure(notices[0], logger);
+        if (_writeFailure is not null) VerifyWriteFailure(notices[0], logger);
+        if (failed)
         {
-            VerifyTrailerFailure(notices[0], logger);
             foreach (var fieldName in new[] { "_ic", "_oc" })
             {
                 var field = typeof(SourceRecorder).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
@@ -167,6 +172,17 @@ internal sealed unsafe class RecorderCutCoverageScenario
             Require(notices[1].Success && notices[1].FileSizeBytes > 0 && CountPackets(_secondFile!) == 1,
                 "새 MP4의 정상 저장을 확인하지 못했습니다.");
         }
+    }
+
+    private void VerifyWriteFailure(VideoSaveNotification notice, TrailerLogger logger)
+    {
+        _writeFailure!.VerifyCompleted();
+        Require(notice.Error == RecorderWriteFailureInjection.FirstError,
+            "첫 패킷 쓰기 오류가 저장 실패 알림에 보존되지 않았습니다.");
+        Require(logger.WriteErrors.Count == 2
+            && logger.WriteErrors[0].Contains(FfmpegLoader.ErrorString(ffmpeg.AVERROR_EXTERNAL), StringComparison.Ordinal)
+            && logger.WriteErrors[1].Contains(FfmpegLoader.ErrorString(ffmpeg.AVERROR_INVALIDDATA), StringComparison.Ordinal),
+            "두 패킷 쓰기 실패 경고를 확인하지 못했습니다.");
     }
 
     private void VerifyTrailerFailure(VideoSaveNotification notice, TrailerLogger logger)
@@ -207,6 +223,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
 
     private int ReadControlled(AVFormatContext* context, AVPacket* packet)
     {
+        _writeFailure?.VerifyBytes();
         _reads++;
         var current = _recorder.Snapshot().CurrentFile;
         if (_reads == 1) _firstFile = current;
@@ -277,6 +294,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
         public string? Message { get; private set; }
         public int ExceptionCount { get; private set; }
         public Exception? Exception { get; private set; }
+        public List<string> WriteErrors { get; } = [];
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
@@ -292,6 +310,8 @@ internal sealed unsafe class RecorderCutCoverageScenario
                 ExceptionCount++;
                 Exception = exception;
             }
+            if (eventId.Id == 36 && logLevel == LogLevel.Warning)
+                WriteErrors.Add(formatter(state, exception));
         }
     }
 }
