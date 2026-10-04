@@ -1,5 +1,9 @@
 # Core 동적 검사 조사 계획
 
+## WritePacket 타임스탬프 누락 반환 검토
+
+PreparePacketForOutput의 false 조건과 호출자의 패킷 해제를 확인하고 기존 TC-15 시험 및 XML을 대조한다. 본 코드 변경 없이 호출자 return까지 재현할 방식을 검토한다.
+
 ## TC-11 파일 크기 조회 경쟁 시험
 
 시험 전용 임시 파일 이름을 별도 스레드에서 교대로 변경하고 실제 ReportClosedSegment를 호출한다. 5초 안에 file_info 실패 알림을 관측해야 통과한다. 정상·누락 파일도 확인하고 제품 불변, 빌드, 반복 실행 및 catch 커버리지를 검증한다.

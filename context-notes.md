@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## WritePacket 타임스탬프 누락 반환 검토
+
+- 이번 요청은 WritePacket의 PreparePacketForOutput 실패 시 return 검토이며 제품·시험 코드는 변경하지 않는다.
+- false를 반환하는 유일한 조건은 packet의 PTS와 DTS가 둘 다 AV_NOPTS_VALUE인 경우다. 음수·PTS/DTS 역전은 보정 후 true를 반환하므로 대상 return에 도달하지 않는다. RunOnce의 앞선 검사는 읽기 반환값과 인덱스이며 타임스탬프 누락을 걸러내지 않는다.
+- WritePacket return은 해당 패킷의 muxer 전달과 RecordedBytes 가산만 생략한다. RunOnce는 바로 av_packet_unref를 실행하고 다음 패킷을 읽으며 종료 시 av_packet_free도 수행한다. return을 제거하면 준비 실패 패킷을 기록하고 시간 변환·출력 인덱스 설정도 수행하지 않은 상태가 된다. 유지 및 시험 권장, 도달 불가능 제외 근거 없음.
+- 기존 TC-15 MISSING_TIMESTAMP는 PreparePacketForOutput만 직접 호출하므로 호출자 WritePacket의 return까지 실행하지 않는다. 결과.xml 파싱으로 helper 544행 covered=yes, WritePacket 521행 covered=no를 확인했다. helper 시험 통과와 호출자 미달성은 모순이 아니다.
+- 제품 수정 없이 TC-15를 실제 RunOnce 경로로 확장할 수 있다. 기존 시험용 av_read_frame 바인딩 방식으로 유효한 스트림 인덱스·데이터를 가진 패킷 하나의 PTS/DTS만 AV_NOPTS_VALUE로 설정한다. 이후 정상 패킷은 유지하고 누락 패킷 제외 후 출력 패킷 수·기록 바이트 및 후속 녹화·해제·바인딩 복원을 확인한다. 타이밍 경쟁 없이 조건을 주입할 수 있으나 이번 검토에서는 새 시험을 구현/실행하지 않았다. 운영 입력의 발생 확률은 측정 근거가 없다.
+- 검증은 실제 소스·TC 연결·XML 파싱 및 git diff --check이며 코드 변경·빌드는 수행하지 않았다.
+
 ## TC-11 파일 크기 조회 경쟁 시험 구현
 
 - 사용자 요청에 따라 시뮬레이터에 추가한다. 임시 파일을 두 이름 사이에서 이동해 존재 검사와 크기 조회 사이 실제 파일 소실을 유도한다. 5초 내 미재현은 명시적인 시험 실패이며 제품 결함으로 단정하지 않는다. 본 코드 수정이나 시스템 파일 API 가로채기는 사용하지 않는다.
