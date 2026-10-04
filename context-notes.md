@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## 입력 스트림 정보 분석 실패 검토
+
+- 사용자가 OpenInput의 find_stream_info 실패 블록 검토를 요청했다. 제품 및 시뮬레이터 소스 수정 없이 기존 시험과 결과를 확인한다.
+- avformat_open_input은 입력 열기와 헤더 읽기, avformat_find_stream_info는 추가 패킷을 읽어 스트림 정보를 수집하는 별도 단계다. FFmpeg 4.4 문서는 후자의 성공값 >=0과 실패 AVERROR를 명시한다. https://ffmpeg.org/doxygen/4.4/group__lavf__decoding.html . 입력 열기 성공은 분석 성공을 보장하지 않으며 손상·불완전 입력 또는 자원 부족 등으로 실패할 수 있다. 모든 손상/연결 중단이 반드시 실패를 반환한다고 단정하지 않는다.
+- 대상 블록은 오류 상태와 로그를 남기고 false를 반환해 미준비 스트림으로 출력 생성을 진행하지 않도록 하므로 유지해야 하며 검사 제외 대상이 아니다. _ic는 열린 컨텍스트로 유지되지만 정상 Run 호출의 finally에서 CloseInput으로 해제된다. 옵션은 OpenInput finally에서 별도로 해제되고, 실행 중이면 2초 뒤 재시도한다.
+- 근본적인 기존 시험 공백을 확인했다. Program.RunStreamInfoFailure는 ReportStreamInfoFailure(NullLogger.Instance) 호출 후 무조건 true를 반환하며, ReportStreamInfoFailure는 CoreLog.CannotFindStreamInfo에 고정 문자열을 넘길 뿐 실제 OpenInput이나 FFmpeg 분석을 실행하지 않는다. TC-13에 연결되어 있지만 해당 실패 블록을 검증하지 않는다.
+- 기존 결과.xml에서 272~275행은 covered=no였다. `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/stream-info-review/result.coverage -f coverage tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe STREAM_INFO_FAILURE` 실행 결과 OK였지만, merge로 만든 result.xml에서 OpenInput 270~275행이 모두 covered=no임을 재확인했다.
+- 후속 수정 방안은 TC-13 기존 시나리오를 실제 입력 열기 성공 후 avformat_find_stream_info만 음수로 반환하는 Harness 바인딩 주입으로 교체하는 것이다. RunOnce 조기 반환, LastError, 활성 logger의 실패 로그, 출력 미생성 및 입력 정리, 바인딩 복원을 검증하면 된다. 본 코드 변경 없이 가능한 방식이며 이번에는 새 실패 주입을 구현하거나 실행하지 않았다.
+
 ## 절단 후 출력 열기 실패 시험 구현
 
 - 사용자 승인에 따라 TC-11 기존 절단 시험을 확장한다. 시험 프로세스에서만 avio_open 바인딩을 교체하며 두 번째 호출에 오류를 반환한다. 본 코드와 기존 사용자 변경은 유지한다.
