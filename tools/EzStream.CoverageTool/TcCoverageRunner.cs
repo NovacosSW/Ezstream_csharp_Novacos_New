@@ -138,7 +138,11 @@ internal sealed class TcCoverageRunner
             [13] = Plan("입력 열기 및 스트림 분석 실패",
                 Step("존재하지 않는 입력", runner.RunMissingInputTestAsync),
                 Step("스트림 정보 검색 실패", CoverageTestRunner.RunStreamInfoFailureTestAsync)),
-            [14] = Plan("녹화 중 입력 중단 및 재연결", Step("기록 중 입력 중단", runner.RunInterruptedStreamTestAsync)),
+            [14] = Plan("녹화 중 입력 중단 및 재연결",
+                Step("기록 중 입력 중단", runner.RunInterruptedStreamTestAsync),
+                Step("일시적 입력 지연 후 녹화 복구", (progress, cancellationToken) =>
+                    HarnessCoverageRunner.RunAsync("RECORDER_EAGAIN",
+                        "EAGAIN 재시도 및 녹화 복구", progress, cancellationToken))),
             [15] = Plan("패킷 타임스탬프 예외 처리",
                 Step("PTS/DTS 없음", CoverageTestRunner.RunMissingTimestampTestAsync),
                 Step("음수·역전 타임스탬프", CoverageTestRunner.RunInvalidTimestampTestAsync)),

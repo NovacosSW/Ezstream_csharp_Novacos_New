@@ -1,5 +1,21 @@
 # 조사 맥락
 
+## EAGAIN 시뮬레이터 통합 검증 결과
+
+- RECORDER_EAGAIN을 별도 Harness 프로세스에 구현하고 TC-14의 두 번째 단계로 연결했다. 기존 MjpegAviWriter를 소스 링크로 재사용한다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false` 성공, 경고/오류 0개.
+- `dotnet build tools/EzStream.CoverageTool/EzStream.CoverageTool.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 성공, 경고/오류 0개.
+- `dotnet-coverage collect --server-mode --background`로 별도 검증 세션을 시작하고 `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RECORDER_EAGAIN` 실행 결과 `OK|RECORDER_EAGAIN 완료`를 확인했다. 세션 종료 및 XML 변환도 성공했다.
+- artifacts/eagain-integration/result.xml의 SourceRecorder.RunOnce 185/186/187행은 모두 covered=yes이다. 시나리오 내부에서 EAGAIN 정확히 1회, 이후 양수 기록 바이트 및 패킷, 바인딩 원복, 저장 MP4의 정상 EOF 및 패킷 수 일치를 검증한다.
+- 시작 전후 SHA256 비교로 추적 src 파일과 기존 제품 DLL/PDB 등 53개 파일의 불변을 확인했다. 기존 사용자 변경은 유지했다. git diff --check 통과.
+- 전체 UI 시험을 직접 재실행하지는 않았다. TC-01~19 전체 실행이 TC-14를 호출하는 기존 경로에 새 단계를 추가했으며, 실행에 사용하는 동일한 collector connect 방식으로 새 검사를 검증했다.
+- 실제 네트워크 장애 시험과 별개로 FFmpeg 반환값을 시험 프로세스에서 제어한다. 비공개 바인딩 필드에 의존하므로 FFmpeg.AutoGen 버전 변경 시 재검증이 필요하다.
+
+## EAGAIN 시뮬레이터 통합 시작
+
+- 사용자 승인에 따라 TC-14 기존 입력 중단 검사와 함께 EAGAIN 재시도 검사를 실행하도록 연결한다. 따라서 TC-01~19 전체 순차 실행에도 포함된다.
+- src/EzStream.Core/Ffmpeg/FfmpegLoader.cs 및 EzStream.sln의 기존 사용자 변경을 유지한다. 제품 소스/제품 DLL은 변경하지 않고 도구 빌드에 BuildProjectReferences=false를 지정한다.
+
 ## 본 코드 변경 없는 EAGAIN 검증 시작
 
 - 사용자 요청은 시뮬레이터만으로 재현 가능한지 실제 확인이다. src 및 기존 제품 DLL은 수정/재빌드하지 않는다. 사용자 EzStream.sln/FfmpegLoader.cs 변경을 보존한다.

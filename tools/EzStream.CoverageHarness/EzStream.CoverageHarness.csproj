@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\EzStream.CoverageTool\MjpegAviWriter.cs" Link="MjpegAviWriter.cs" />
     <ProjectReference Include="..\..\src\EzStream.Core\EzStream.Core.csproj" />
     <ProjectReference Include="..\..\src\EzStream.Service\EzStream.Service.csproj" />
     <ProjectReference Include="..\..\src\EzStream.Tray\EzStream.Tray.csproj" />
