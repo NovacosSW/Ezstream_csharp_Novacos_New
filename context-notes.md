@@ -1,5 +1,16 @@
 # 조사 맥락
 
+## 트레일러 관리 예외 catch 검토
+
+- 사용자 요청은 WriteTrailerFailed를 호출하는 관리 예외 catch 검토다. 제품 및 시뮬레이터 코드는 변경하지 않는다.
+- try에는 네이티브 호출의 관리 바인딩, 음수 반환 시 ErrorString 변환과 WriteTrailerReturnedError 로그 호출까지 포함된다. FFmpeg의 일반적인 디스크/메모리 오류는 음수 반환이며 catch를 실행하지 않는다. 정상 배포에서 관리 예외는 드문 방어 경로로 판단하되 확률을 수치화하지 않는다.
+- 관리 바인딩/함수 해석 실패 또는 try 안의 ILogger 구현에서 던진 예외 등이 가능한 경로다. 초기 FfmpegLoader가 avformat_version으로 DLL을 확인하므로 일반적인 DLL 누락은 보통 앞에서 발견된다. 네이티브 로그 콜백 밖으로 예외를 던지는 방식은 안전한 일반 재현 경로로 취급하지 않는다.
+- 필터는 OOM/StackOverflow/AccessViolation 세 형식을 이 catch에서 처리하지 않는다는 의미다. 실제 스택 고갈과 런타임/네이티브 접근 위반은 일반 catch로 복구할 수 없는 경우가 있다. https://learn.microsoft.com/en-us/dotnet/api/system.stackoverflowexception?view=net-9.0 및 https://learn.microsoft.com/en-us/dotnet/api/system.accessviolationexception?view=net-9.0 확인. 단순 new Exception 계열 주입은 실제 프로세스 손상을 재현하지 않는다.
+- 보통의 관리 예외를 로그·closeError로 바꾸고 후속 파일/컨텍스트 정리와 실패 알림을 이어가는 목적이 있으므로 유지 및 시험을 권장한다. 코드 근거만으로 catch 전체를 도달 불가능 제외 처리할 수는 없다. 다만 정리가 finally에 있지는 않아 필터 제외 예외나 catch 내부의 로깅 자체가 다시 예외를 던지면 뒤 정리는 보장되지 않는다. 현재 동작의 한계이며 이번 요청에서 수정하지 않는다.
+- 결과.xml에서 catch 본문 441~444행 미실행을 확인했다. 최근 추가한 트레일러 오류 시험은 음수 반환만 주입하므로 이 catch를 실행하지 않는다.
+- 시뮬레이터만으로 일반 예외 경로를 시험할 수 있다. TC-11 Harness의 관리 av_write_trailer 바인딩에서 원래 네이티브 종료를 정상 수행한 뒤 InvalidOperationException을 던진다. 이는 제품 catch 분기 검증이며 실제 디스크/네이티브 장애 재현은 아니다. WriteTrailerFailed 로그, 예외 메시지가 담긴 실패 저장 알림, 파일 잠금 해제와 컨텍스트 정리를 검증해야 한다. 필터 제외 세 형식의 실제 장애 유발은 필요하지 않다.
+- 이번 검증은 소스 및 XML 파싱과 .NET 공식 예외 문서 확인이며 코드 변경/새 시험/빌드는 수행하지 않았다.
+
 ## TC-11 트레일러 오류 반환 검사 구현
 
 - 사용자가 승인한 트레일러 오류 반환 검사를 기존 절단 시험에 추가한다. 실제 파일 종료 후 반환값만 오류로 바꾸며 실제 디스크 장애나 손상 MP4 재현으로 해석하지 않는다. 본 코드는 유지한다.
