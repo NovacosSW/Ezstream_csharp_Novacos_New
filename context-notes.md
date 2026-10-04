@@ -1,5 +1,23 @@
 # 조사 맥락
 
+## 본 코드 변경 없는 EAGAIN 검증 시작
+
+- 사용자 요청은 시뮬레이터만으로 재현 가능한지 실제 확인이다. src 및 기존 제품 DLL은 수정/재빌드하지 않는다. 사용자 EzStream.sln/FfmpegLoader.cs 변경을 보존한다.
+- 시험 프로세스에 로드된 FFmpeg.AutoGen의 함수 바인딩만 일시 교체할 수 있는지 조사하고, 가능하면 기존 SourceRecorder DLL로 검증한다.
+
+## 본 코드 변경 없는 EAGAIN 검증 결과
+
+- 설치된 FFmpeg.AutoGen 4.4.1.1의 ffmpeg.av_read_frame_fptr는 비공개 static delegate 필드이며 readonly가 아니다. reflection으로 시험 프로세스 메모리 안에서만 바인딩을 교체할 수 있음을 확인했다.
+- artifacts/eagain-probe에 별도 .NET 9 검증 실행기를 만들었다. ProjectReference 대신 기존 제품 DLL을 Reference로 읽어 제품 소스 및 바이너리를 재빌드하지 않았다. 기존 MjpegAviWriter 소스를 링크해 80프레임 AVI를 생성했다.
+- 실제 SourceRecorder.RunOnce를 호출하면서 첫 av_read_frame만 EAGAIN을 반환하고 이후 호출은 기존 avformat-58.dll의 실제 av_read_frame으로 전달했다. ffmpeg 라이브러리 자체나 제품 DLL을 패치하지 않았다. 바인딩은 finally에서 기존 값으로 복구한다.
+- `dotnet build artifacts/eagain-probe/Probe.csproj -c Debug` 성공, 경고/오류 0개.
+- `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/eagain-probe/eagain.coverage -f coverage artifacts/eagain-probe/bin/Debug/net9.0-windows/Probe.exe artifacts/eagain-probe/media ffmpeg` 성공.
+- 관측 결과 EAGAIN 주입 1회, 후속 네이티브 읽기 81회, 정상 패킷 80개, 기록 바이트 276399. 바인딩 복원 후 실제 FFmpeg로 완성된 MP4를 다시 읽어 80개 패킷 확인.
+- `dotnet-coverage merge artifacts/eagain-probe/eagain.coverage -o artifacts/eagain-probe/eagain.xml -f xml` 성공. 기존 미달성 RunOnce 185/186/187행 모두 covered=yes.
+- 시작 전 기록한 git 추적 src 파일 전체와 사용 제품 Core DLL/PDB 및 FFmpeg.AutoGen.dll의 SHA256을 시험 후 비교해 모두 불변을 확인했다. 사용자 수정 EzStream.sln/FfmpegLoader.cs도 유지했다.
+- 결론은 현재 바인딩 버전에서 시뮬레이터/Harness만 변경하여 EAGAIN 분기 재현 가능이다. 실제 네트워크 지연을 재현한 것이 아니라 FFmpeg의 허용 반환값을 시험 프로세스에서 제어한 오류 주입 시험이다.
+- 이번 요청은 가능 여부 확인이므로 기존 시뮬레이터 TC에는 아직 연결하지 않았다. 통합할 경우 별도 Harness 프로세스에서 수행하고 바인딩 복원 및 후속 패킷/저장 검증을 유지해야 한다. 비공개 바인딩 필드를 사용하므로 FFmpeg.AutoGen 버전 변경 시 재확인이 필요하다.
+
 ## SourceRecorder 패킷 재시도 검토 시작
 
 - 사용자 인용 블록은 RunOnce에 두 번 있다. 결과.xml에서 EAGAIN 블록(185~187행)은 미달성, outIdx < 0 블록(201~203행)은 달성이다. 따라서 EAGAIN을 주 대상으로 검토하고 둘의 차이를 설명한다.
