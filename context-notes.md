@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## 파일 크기 조회 예외 검토
+
+- GetFileSize catch 검토 요청이다. 제품 및 시뮬레이터 코드는 수정하지 않는다.
+- File.Exists와 new FileInfo(...).Length는 별도 조회다. Exists가 true인 뒤 삭제·이름 변경·접근권 변경·저장소 장애가 발생하면 Length에서 예외가 발생할 수 있다. 정상 로컬 저장에서는 드문 경쟁 조건으로 판단하되 수치 확률은 근거가 없다. Microsoft File.Exists 문서도 존재 검사와 후속 작업 사이 외부 변경 가능성을 명시한다. https://learn.microsoft.com/en-us/dotnet/api/system.io.file.exists?view=net-9.0 및 https://learn.microsoft.com/en-us/dotnet/api/system.io.fileinfo.length?view=net-9.0 확인.
+- 미리 파일을 삭제하거나 잘못된 경로·디렉터리·접근 불가 경로를 전달하면 일반적으로 Exists가 false를 반환하여 catch가 아닌 정상 0 반환으로 끝난다. 파일 내용 독점 잠금만으로 메타데이터 Length 조회 실패를 보장하지 못한다.
+- catch는 오류 메시지와 크기 0을 반환한다. ReportClosedSegment는 기존 closeError가 없을 때만 file_info를 채택하고 실패 저장 알림을 보낸다. 제거 시 예외가 보고 흐름을 중단하며 Run finally의 CloseOutput에서 발생하면 뒤 CloseInput도 건너뛸 수 있다. 코드 유지 권장, 도달 불가능 제외 근거 없음.
+- 시뮬레이터 전용 임시 파일의 생성·삭제 또는 이름 변경을 병행하며 실제 GetFileSize를 반복 호출하는 경쟁 시험은 가능하지만 Exists와 Length 사이의 짧은 타이밍에 의존하므로 매 실행 성공을 보장할 수 없다. 기존 FFmpeg delegate 교체 방식으로 이 .NET 파일 API 사이에 직접 개입할 수는 없다. 결정적인 시험에는 별도 런타임/파일 API 가로채기 수단이 필요하며 현재 프로젝트에서 그 수단을 확인하거나 재현 실행한 것은 아니다. 제품 변경 금지 조건을 유지한다.
+- PowerShell XML 파싱으로 결과.xml GetFileSize의 490~493행 미실행 확인. 이번에는 코드와 문서 검토만 수행했고 동적 재현·빌드는 실행하지 않았다. git diff --check로 문서 변경을 검증한다.
+
 ## 출력 IO 닫기 오류 검토
 
 - 요청 범위는 avio_closep 음수 반환 및 closeError null 조건 검토다. 제품 및 시뮬레이터 코드는 수정하지 않는다.
