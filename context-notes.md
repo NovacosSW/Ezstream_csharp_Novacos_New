@@ -1,5 +1,15 @@
 # 조사 맥락
 
+## 입력 스트림 인덱스 검토 시작
+
+- 사용자는 SourceRecorder 199행의 삼항식 검토를 요청했다. 코드 변경 승인으로 확대하지 않고 현재 매핑 수명과 FFmpeg 계약을 검토한다.
+- 결과.xml을 PowerShell XML로 읽어 RunOnce 199행 covered=partial, 201~203행 covered=yes를 확인했다. 이 보고서는 조건별 세부 결과를 제공하지 않으므로 음수/상한 분기 중 정확히 무엇이 미달성인지 단정하지 않는다.
+- SourceRecorder 348행에서 _ic->nb_streams 크기로 매핑을 생성하고 비디오는 출력 인덱스, 나머지는 -1을 저장한다. 세그먼트 생성 전의 스냅샷이므로 나중에 추가된 스트림은 기존 매핑 상한을 벗어날 수 있다.
+- FFmpeg n4.4 공식 avformat.h의 AVFormatContext.streams 주석은 AVFMTCTX_NOHEADER인 경우 av_read_frame 중 새 스트림이 나타날 수 있다고 명시한다. 근거 https://github.com/FFmpeg/FFmpeg/blob/n4.4/libavformat/avformat.h . av_read_frame 성공 패킷은 AVStream을 식별하는 stream_index를 가진다. 정상 음수 인덱스는 기대하지 않는다.
+- 상한 방어는 유지 권장하며 도달 불가능으로 제외할 근거가 없다. 음수 방어는 비정상 라이브러리 반환을 대비한 조건으로 별도 제외 검토가 가능하나, 오류 주입 검증이 가능하므로 우선 시험을 권장한다. 확률 수치는 운영 통계가 없어 산정하지 않는다.
+- 앞의 ret 검사는 읽기 성공 여부이며 과거에 만든 매핑의 범위를 보장하지 않는다. 뒤의 outIdx<0 검사 역시 배열 접근 이후이므로 이 줄의 범위 검사를 대체하지 못한다. 범위 검사를 삭제하면 IndexOutOfRangeException 가능성이 생긴다.
+- 기존 Harness 바인딩 교체 방식에서 네이티브 읽기 성공 후 패킷 인덱스를 -1과 매핑 길이로 각각 바꾸는 방식으로 본 코드 변경 없이 두 거짓 조건을 시험할 수 있다. 실제 스트림 추가를 재현하는 시험과는 구분해야 한다. 이번에는 검토만 수행했고 새 시험을 구현하거나 실행하지 않았다.
+
 ## EAGAIN 시뮬레이터 통합 검증 결과
 
 - RECORDER_EAGAIN을 별도 Harness 프로세스에 구현하고 TC-14의 두 번째 단계로 연결했다. 기존 MjpegAviWriter를 소스 링크로 재사용한다.
