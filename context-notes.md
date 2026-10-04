@@ -1,5 +1,21 @@
 # 조사 맥락
 
+## FFmpeg 로그 콜백 null 분기 검토 결과
+
+- 결과.xml의 FfmpegLoader.cs SHA256은 현재 파일과 일치한다. 로그 콜백은 블록 16/17(94.12%), 줄 90.91%이고 43행만 partial이다. 초기화 본체는 100%다.
+- 43행의 ?.는 PtrToStringAnsi가 null이면 TrimEnd를 건너뛰는 분기를 만든다. 입력 포인터는 직전 stackalloc byte[1024]로 확보한 버퍼이며 외부 입력 포인터가 아니다. 유효한 실행에서 이 포인터가 null/Win32 atom 값이 될 수 없으므로 null 반환 분기는 도달 불가로 판단한다.
+- 공식 Marshal 구현은 null/Win32 atom 포인터에 null을 반환하고 그 외에는 해당 주소에서 문자열을 생성한다. 빈 C 문자열은 null이 아니라 string.Empty다. 네이티브 오류/메모리 손상을 null 반환으로 안전하게 처리해 주는 API가 아니므로 ?.를 그 방어책으로 해석하면 안 된다.
+- FFmpeg 4.4 av_log_format_line은 av_log_format_line2를 호출하며 후자는 제공된 버퍼에 snprintf로 문자열을 기록한다. 버퍼 내용이 비어도 포인터 자체는 바뀌지 않는다.
+- 기존 Harness의 ExerciseFfmpegCallbackBranches는 빈 format으로 콜백을 호출한다. XML에서 44행 빈 문자열 return 경로는 이미 달성이다. 빈 로그 추가로 43행 null 분기를 달성할 수 없다.
+- 임시 .NET 9 실행기를 `artifacts/ffmpeg-null-review`에 작성해 현재 ffmpeg/avutil-56.dll로 같은 stackalloc → av_log_format_line → PtrToStringAnsi → TrimEnd 경로를 검증했다. 제품 코드는 변경하지 않았다.
+- `dotnet build artifacts/ffmpeg-null-review/Probe.csproj -c Debug` 성공, 경고/오류 0개. `artifacts/ffmpeg-null-review/bin/Debug/net9.0-windows/Probe.exe ffmpeg` 성공. 빈 입력, 공백/개행, 일반 문구 모두 null=False이며 TrimEnd 결과는 예상과 일치했다. 대조군 IntPtr.Zero만 null을 반환했다.
+- 권장 변경안은 근거 주석과 함께 `Marshal.PtrToStringAnsi((IntPtr)lineBuffer)!.TrimEnd()`로 불필요한 null 조건부 분기를 제거하는 것이다. !는 컴파일러 null 분석 표기이며 런타임 검사가 아니다. 다음 줄의 빈 문자열 검사는 유지한다. 같은 파일 ErrorString에도 stackalloc 버퍼의 변환 결과에 !를 사용하는 선례가 있다.
+- 소스 변경을 원하지 않으면 해당 null 분기만 도달 불가 근거로 검사 예외를 검토할 수 있다. 전체 로그 콜백을 검사에서 제외하는 것은 부적절하다. 외부 검사 규정의 예외 승인은 별도이며 이 검토가 승인을 대신하지 않는다.
+- 정상 호출 계약을 깨서 포인터를 0으로 바꾸거나 Marshal을 가짜 구현으로 대체하는 것은 현 제품 경로의 의미 있는 재현이 아니다. 제품 소스 및 검사 제외 설정은 변경하지 않았다.
+- 공식 근거.
+  - https://source.dot.net/System.Private.CoreLib/src/runtime/src/libraries/System.Private.CoreLib/src/System/Runtime/InteropServices/Marshal.cs.html
+  - https://ffmpeg.org/doxygen/4.4/log_8c_source.html
+
 ## Host 정상 종료 시험 구현 시작
 
 - 사용자가 유사 시험과 함께 실행하도록 요청하여 TC-20에 정상 Host 종료 시나리오를 추가한다. 실제 서비스/비콘솔 시험 종료 후 실행해 파이프 충돌을 피한다.

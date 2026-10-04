@@ -30,3 +30,7 @@ Program.cs의 Build/Run 커버리지를 결과.xml과 대조하고 .NET 9 Host �
 ## Host 정상 종료 시험 통합
 
 TC-20에서 기존 Service 프로세스 종료 뒤 실제 Service 엔트리포인트를 Harness에서 실행한다. .NET Host 진단 이벤트로 생성된 Host를 관찰하고 시작 완료 후 StopApplication을 요청하여 Run의 정상 반환과 ApplicationStopped를 검증한다. 기존 Service 수집 세션에 연결해 결과에 포함하며 제품 Program은 변경하지 않는다. 빌드와 실제 수집으로 Program 및 기존 IPC 시험을 확인한다.
+
+## FFmpeg 로그 문자열 부분 달성 검토
+
+결과.xml의 로그 콜백 부분 달성을 현재 소스와 대조하고 .NET 9 Marshal 및 FFmpeg 4.4 구현으로 null 반환 조건을 확인한다. 실제 런타임 문자열 변환을 검증한 뒤 재현 및 제외 가능성을 판단한다. 제품 소스는 검토만 한다.
