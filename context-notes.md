@@ -51,6 +51,21 @@ Service/Tray/Harness를 같은 빌드에서 생성하고 Core DLL/PDB를 함께 
 
 ## PipeServer 검토 시작
 
+- 후속 요청으로 정식 시뮬레이터의 기존 유사 검사에 재현 시나리오를 통합한다. TC-20의 PIPE_ACCEPT_FAILURE를 확장하며 제품 방어 코드 및 검사 제외 설정은 유지한다.
+
+## 시뮬레이터 IPC 검사 반영 결과
+
+- TC-20의 기존 IPC 검사에서 cancel-wait, disconnect-retry, cancel-delay를 순서대로 실행한다. 새 버튼은 추가하지 않았다.
+- 기존 reflection 기반 Harness 스타일에 맞춰 실제 AcceptLoop를 호출하고 Stop이 사용하는 토큰/Task를 연결했다. 이는 Task.Run 스케줄링 전에 취소되어 루프에 진입하지 않는 경쟁을 피한다.
+- 로그 이벤트로 실제 파이프 오류를 확인한다. 복구 시험은 750ms 후 GET_STATUS 응답의 Ok와 Status를 확인한다. 지연 취소 시험은 오류 로그 콜백에서 토큰을 취소해 Task.Delay 취소 처리를 확정적으로 실행한다.
+- 각 시험은 루프가 정상 완료했는지 직접 검사하므로 Stop에서 예외를 삼켜도 성공으로 오인하지 않는다. 사용하지 않게 된 PipeAcceptErrors 카운터는 제거했다.
+- 초기 빌드의 CA2000 분석 오류는 각 시나리오의 IDisposable 수명을 별도 함수로 분리해 해결했다. 최종 Harness와 CoverageTool 빌드는 경고 0개, 오류 0개다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore` 통과.
+- `dotnet build tools/EzStream.CoverageTool/EzStream.CoverageTool.csproj -c Debug --no-restore` 통과. 기존 실행 중인 시뮬레이터 창이 EXE를 잠가 최초 복사가 실패하여 정상 창 닫기를 요청한 후 같은 경로로 빌드했다. 강제 종료하지 않았다.
+- `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/pipe-accept-update/pipe.coverage -f coverage tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe PIPE_ACCEPT_FAILURE` 통과.
+- 바이너리 결과를 `dotnet-coverage merge artifacts/pipe-accept-update/pipe.coverage -o artifacts/pipe-accept-update/pipe.xml -f xml`로 변환한 결과 AcceptLoop 블록 32/32, 줄 100%를 확인했다. 기존 결과와 합치지 않은 단일 시나리오 결과다.
+- `git diff --check` 통과. 제품 PipeServer 및 사용자 EzStream.sln 수정은 건드리지 않았다. 전체 TC-01~22 UI 시험은 재실행하지 않았다. 개발 Debug 빌드만 갱신했고 기존 ZIP/배포본은 갱신하지 않았다.
+
 - 사용자가 루트 `결과.xml` 기준으로 AcceptLoop 미달성 예외 경로의 현실성, 제외 및 재현 가능성을 요청했다. 확률을 산출할 운영 통계는 없으므로 조건 기반 정성 평가로 설명한다.
 - 기존 `EzStream.sln` 변경은 보존한다. 검사 제외나 제품 코드 변경은 이번 검토 범위에 포함하지 않는다.
 

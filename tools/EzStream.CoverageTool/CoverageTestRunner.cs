@@ -419,7 +419,7 @@ internal sealed class CoverageTestRunner
         CancellationToken cancellationToken)
         => HarnessCoverageRunner.RunAsync(
             "PIPE_ACCEPT_FAILURE",
-            "IPC 연결 중단 및 accept 재시도 취소",
+            "IPC 연결 대기 취소·연결 중단 후 복구·재시도 지연 취소",
             progress,
             cancellationToken);
 

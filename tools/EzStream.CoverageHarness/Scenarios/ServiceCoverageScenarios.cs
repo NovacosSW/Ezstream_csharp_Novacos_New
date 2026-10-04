@@ -198,14 +198,45 @@ internal static class ServiceCoverageScenarios
         var root = Path.Combine(
             Path.GetTempPath(), "ezstream-pipe-abort-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        var logger = new ExercisingLogger();
         try
         {
-            using var engine = new RecorderEngine(new RecorderConfig(), logger);
-            using var pipe = new PipeServer(engine, Path.Combine(root, "config.json"), logger);
-            pipe.Start();
-            Thread.Sleep(100);
+            foreach (var scenario in new[] { "cancel-wait", "disconnect-retry", "cancel-delay" })
+                ExercisePipeAcceptScenario(root, scenario);
+            return "IPC 연결 대기 취소·연결 중단 후 상태 조회 복구·재시도 지연 취소 완료";
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
 
+    private static void ExercisePipeAcceptScenario(string root, string scenario)
+    {
+        MethodInfo accept = typeof(PipeServer).GetMethod(
+            "AcceptLoop", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(PipeServer).FullName, "AcceptLoop");
+        using var cancellation = new CancellationTokenSource();
+        using var errorObserved = new ManualResetEventSlim();
+        var logger = new ExercisingLogger
+        {
+            OnPipeAcceptError = () =>
+            {
+                if (scenario == "cancel-delay")
+                    cancellation.Cancel();
+                errorObserved.Set();
+            },
+        };
+        using var engine = new RecorderEngine(new RecorderConfig(), logger);
+        using var pipe = new PipeServer(engine, Path.Combine(root, "config.json"), logger);
+        // 연결 대기가 시작된 뒤 취소하도록 실제 비동기 루프를 직접 호출한다.
+        var loop = (Task)(accept.Invoke(pipe, [cancellation.Token])
+            ?? throw new InvalidOperationException("IPC 수신 루프를 시작하지 못했습니다."));
+        SetField(pipe, "_cts", cancellation);
+        SetField(pipe, "_loop", loop);
+
+        if (scenario != "cancel-wait")
+        {
             using (var client = new NamedPipeClientStream(
                 ".", AppPaths.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous))
             {
@@ -216,18 +247,24 @@ internal static class ServiceCoverageScenarios
                 client.Flush();
             }
 
-            for (var attempt = 0; attempt < 100 && logger.PipeAcceptErrors == 0; attempt++)
-                Thread.Sleep(10);
-            pipe.Stop();
-            if (logger.PipeAcceptErrors == 0)
+            if (!errorObserved.Wait(TimeSpan.FromSeconds(5)))
                 throw new InvalidOperationException("IPC 연결 중단 예외를 확인하지 못했습니다.");
-            return "pipe accept failure completed";
+            if (scenario == "disconnect-retry")
+            {
+                Thread.Sleep(750);
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = PipeClient.SendAsync(
+                    new IpcRequest { Command = IpcCommands.GetStatus }, ct: timeout.Token)
+                    .GetAwaiter().GetResult();
+                if (!response.Ok || response.Status is null)
+                    throw new InvalidOperationException("IPC 연결 중단 후 상태 조회 복구를 확인하지 못했습니다.");
+            }
         }
-        finally
-        {
-            if (Directory.Exists(root))
-                Directory.Delete(root, recursive: true);
-        }
+
+        pipe.Stop();
+        loop.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+        if (loop.Status != TaskStatus.RanToCompletion)
+            throw new InvalidOperationException($"IPC {scenario} 정상 종료를 확인하지 못했습니다.");
     }
 
     private static void ExerciseGeneratedLogs(ILogger logger)
@@ -545,7 +582,7 @@ internal static class ServiceCoverageScenarios
     private sealed class ExercisingLogger : ILogger, ILogger<Worker>
     {
         public int MessagesFormatted { get; private set; }
-        public int PipeAcceptErrors { get; private set; }
+        public Action? OnPipeAcceptError { get; init; }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
             => EmptyScope.Instance;
@@ -564,7 +601,7 @@ internal static class ServiceCoverageScenarios
             _ = formatter(state, exception);
             MessagesFormatted++;
             if (eventId.Id == 101)
-                PipeAcceptErrors++;
+                OnPipeAcceptError?.Invoke();
 
             if (state is IReadOnlyList<KeyValuePair<string, object?>> values)
             {
