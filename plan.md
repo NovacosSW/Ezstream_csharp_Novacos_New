@@ -34,3 +34,7 @@ TC-20에서 기존 Service 프로세스 종료 뒤 실제 Service 엔트리포�
 ## FFmpeg 로그 문자열 부분 달성 검토
 
 결과.xml의 로그 콜백 부분 달성을 현재 소스와 대조하고 .NET 9 Marshal 및 FFmpeg 4.4 구현으로 null 반환 조건을 확인한다. 실제 런타임 문자열 변환을 검증한 뒤 재현 및 제외 가능성을 판단한다. 제품 소스는 검토만 한다.
+
+## FFmpeg null 조건 제거
+
+사용자 승인에 따라 로그 콜백의 ?.TrimEnd()를 !.TrimEnd()로 변경하고 stackalloc 버퍼의 불변 조건을 주석으로 남긴다. 빈 문자열 검사는 유지한다. Harness 참조 빌드로 Service/Tray/Core를 갱신하고 Core 테스트 및 실제 로그 콜백 커버리지를 검증한다.

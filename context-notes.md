@@ -1,5 +1,19 @@
 # 조사 맥락
 
+## FFmpeg null 조건 제거 시작
+
+- 사용자가 검토된 변경을 승인했다. 로그 변환의 ?.만 !.로 바꾸고 빈 문자열 처리는 유지한다. 기존 사용자 EzStream.sln 변경을 보존한다.
+
+## FFmpeg null 조건 제거 검증 결과
+
+- FfmpegLoader 로그 변환을 `Marshal.PtrToStringAnsi((IntPtr)lineBuffer)!.TrimEnd()`로 변경했다. stackalloc 버퍼 근거 주석을 추가했고 다음 줄의 빈 문자열 검사는 유지했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore` 성공. Core/Service/Tray/Harness Debug 출력 갱신, 경고/오류 0개.
+- `dotnet test tests/EzStream.Core.Tests/EzStream.Core.Tests.csproj -c Debug --no-restore` 성공. 통과 28, 실패 0, 건너뜀 0.
+- `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/ffmpeg-null-update/residual.coverage -f coverage tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RESIDUAL_BRANCHES` 성공.
+- 바이너리 결과를 residual.xml로 변환해 변경한 44행 covered=yes, 빈 문자열 반환 45행 covered=yes를 확인했다. 콜백 전체는 해당 단일 시나리오에서 블록 66.67%이며, 이번 확인은 변경 줄의 부분 달성 해소에 대한 것이다. 전체 콜백/전체 UI 100%를 재검증한 것은 아니다.
+- Service/Tray/Harness의 Core DLL/PDB GUID가 각각 일치하고 세 폴더의 DLL/PDB 해시도 동일하다. 증거는 artifacts/ffmpeg-null-update/symbol-check.json이다.
+- `git diff --check` 통과. 기존 결과.xml은 보존했고 개발 Debug 출력만 갱신했다. 새 Core 빌드는 모듈 식별자가 달라지므로 기존 수집 결과에 섞지 말고 새 전체시험 회차에서 검사한다.
+
 ## FFmpeg 로그 콜백 null 분기 검토 결과
 
 - 결과.xml의 FfmpegLoader.cs SHA256은 현재 파일과 일치한다. 로그 콜백은 블록 16/17(94.12%), 줄 90.91%이고 43행만 partial이다. 초기화 본체는 100%다.

@@ -40,7 +40,8 @@ public static class FfmpegLoader
                 var lineBuffer = stackalloc byte[lineSize];
                 int printPrefix = 1;
                 ffmpeg.av_log_format_line(p0, level, format, vl, lineBuffer, lineSize, &printPrefix);
-                var line = Marshal.PtrToStringAnsi((IntPtr)lineBuffer)?.TrimEnd();
+                // stackalloc으로 확보한 버퍼이므로 변환 결과는 null이 아닌 문자열이다.
+                var line = Marshal.PtrToStringAnsi((IntPtr)lineBuffer)!.TrimEnd();
                 if (string.IsNullOrEmpty(line)) return;
                 var mappedLevel = MapLevel(level);
                 if (logger.IsEnabled(mappedLevel))
