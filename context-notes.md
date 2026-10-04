@@ -1,5 +1,13 @@
 # 조사 맥락
 
+## TC-15 음수·역전 보정 결과 검증 강화
+
+- 사용자 승인에 따라 시뮬레이터 TC-15의 반환값 전용 검사를 최종 PTS/DTS 검증으로 교체한다. 제품 코드는 유지하고 새로운 독립 수집 결과로 확인한다.
+- 기존 음수·역전 입력에 정상 양수·0 경계·PTS 누락/DTS 음수·DTS 누락/PTS 음수를 더해 6개 보정 입력의 true 반환, 기준값 0 유지 및 최종 숫자를 단언한다. 기존 3개 기준 시각 선택 시험도 유지한다. 실패 메시지에는 입력과 실제 보정값을 포함한다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool 동일 빌드 모두 경고 0·오류 0으로 통과했다.
+- 새 세션에서 `dotnet-coverage connect <session> <Harness.exe> INVALID_TIMESTAMP`와 `MISSING_TIMESTAMP` 모두 OK. `artifacts/timestamp-correction-integration/result.xml`의 560·561행 조건과 대입, 562~563행 조건 및 565행 대입 모두 covered=yes 확인. 제품 소스/바이너리 53개 해시 불변, 제품/Harness DLL·PDB 6쌍 일치, git diff --check 통과.
+- TC-15 및 전체 UI 시험에 연결되어 있다. 이번에는 두 Harness 시나리오만 실행했고 전체 UI 버튼은 실행하지 않았다. 기존 사용자 Results/결과.xml은 유지했다. 새 독립 결과는 해당 분기 검증용이며 전체 프로그램의 종합 커버리지 수치가 아니다.
+
 ## 음수·역전 타임스탬프 조건 검토
 
 - 사용자가 제시한 세 조건은 세그먼트 기준 차감·시간 단위 변환 후 유효한 음수 DTS/PTS를 0으로 제한하고 둘 다 유효할 때 PTS<DTS를 PTS=DTS로 보정한다. AV_NOPTS_VALUE는 음수인 누락값이므로 첫 조건을 제거하면 누락값을 정상 시각 0으로 바꿀 수 있다. 둘 다 누락인 경우는 앞에서 반환하지만 한쪽만 누락인 경우는 여기까지 도달한다.

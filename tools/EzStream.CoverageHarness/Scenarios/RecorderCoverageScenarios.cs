@@ -36,16 +36,26 @@ internal static class RecorderCoverageScenarios
     public static unsafe bool RunInvalidTimestampOrder()
     {
         var timeBase = new AVRational { num = 1, den = 1000 };
-        var segmentStart = 0L;
-        var negative = new AVPacket { pts = -20, dts = -10 };
-        var negativeAccepted = SourceRecorder.PreparePacketForOutput(
-            &negative, timeBase, timeBase, 0, ref segmentStart);
-
-        segmentStart = 0;
-        var reversed = new AVPacket { pts = 5, dts = 10 };
-        var reversedAccepted = SourceRecorder.PreparePacketForOutput(
-            &reversed, timeBase, timeBase, 0, ref segmentStart);
-        return negativeAccepted && reversedAccepted && RunTimestampReferenceSelection();
+        foreach (var test in new[]
+        {
+            (Pts: -20L, Dts: -10L, ExpectedPts: 0L, ExpectedDts: 0L),
+            (Pts: 5L, Dts: 10L, ExpectedPts: 10L, ExpectedDts: 10L),
+            (Pts: 20L, Dts: 10L, ExpectedPts: 20L, ExpectedDts: 10L),
+            (Pts: 0L, Dts: 0L, ExpectedPts: 0L, ExpectedDts: 0L),
+            (Pts: ffmpeg.AV_NOPTS_VALUE, Dts: -10L, ExpectedPts: ffmpeg.AV_NOPTS_VALUE, ExpectedDts: 0L),
+            (Pts: -20L, Dts: ffmpeg.AV_NOPTS_VALUE, ExpectedPts: 0L, ExpectedDts: ffmpeg.AV_NOPTS_VALUE),
+        })
+        {
+            var segmentStart = 0L;
+            var packet = new AVPacket { pts = test.Pts, dts = test.Dts };
+            var accepted = SourceRecorder.PreparePacketForOutput(
+                &packet, timeBase, timeBase, 0, ref segmentStart);
+            if (!accepted || segmentStart != 0
+                || packet.pts != test.ExpectedPts || packet.dts != test.ExpectedDts)
+                throw new InvalidOperationException(
+                    $"타임스탬프 보정 실패: 입력 PTS={test.Pts}, DTS={test.Dts}; 결과 PTS={packet.pts}, DTS={packet.dts}");
+        }
+        return RunTimestampReferenceSelection();
     }
 
     private static unsafe bool RunTimestampReferenceSelection()

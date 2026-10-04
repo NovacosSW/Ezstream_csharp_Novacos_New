@@ -433,7 +433,7 @@ internal sealed class CoverageTestRunner
         IProgress<string> progress,
         CancellationToken cancellationToken)
         => HarnessCoverageRunner.RunAsync(
-            "INVALID_TIMESTAMP", "음수·역전 보정 및 PTS/DTS 기준 시각 선택", progress, cancellationToken);
+            "INVALID_TIMESTAMP", "음수·역전·정상·단독 타임스탬프 보정값 및 기준 시각 검증", progress, cancellationToken);
 
     public static Task<TestResult> RunStreamInfoFailureTestAsync(
         IProgress<string> progress,
