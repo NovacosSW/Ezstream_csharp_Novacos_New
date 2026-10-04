@@ -1,5 +1,16 @@
 # 조사 맥락
 
+## 코덱 파라미터 복사 실패 검토
+
+- 사용자 요청은 parameters_copy 실패 블록 검토다. 제품 및 시뮬레이터 코드 수정 없이 구현과 커버리지를 확인한다.
+- FFmpeg n4.4 codec_par.c의 avcodec_parameters_copy는 대상 초기화와 구조체 복사 후 extradata를 별도 할당해 복사한다. src->extradata가 있고 av_mallocz가 실패하면 AVERROR(ENOMEM)을 반환한다. 이 구현의 정상 포인터 조건에서 다른 음수 반환 경로는 없다. https://github.com/FFmpeg/FFmpeg/blob/n4.4/libavcodec/codec_par.c . extradata가 없으면 해당 할당 없이 0을 반환하므로 입력마다 실제 실패 가능 조건이 다르다.
+- 이전 출력 스트림 생성 성공은 extradata 복사용 추가 할당 성공을 보장하지 않는다. 일반 운영에서는 드문 네이티브 메모리 오류이며 통계 없이 확률을 수치화하지 않는다. 미지원 코덱/권한/디스크 용량을 이 함수의 직접 실패 원인으로 보지 않는다.
+- 검사 제거 시 extradata가 빠진 불완전한 파라미터로 출력 준비를 계속할 수 있으므로 유지하며 검사 제외 대상으로 보지 않는다. SetError와 실패 알림, false 반환은 적절하다. 별도 전용 로그 호출은 없으며 오류 상태/저장 알림으로 보고한다.
+- 실패 시 출력 컨텍스트와 생성된 스트림 및 codecpar는 상위 Run finally의 CloseOutput→avformat_free_context에서 해제된다. 실제 FFmpeg 실패 시 목적지 extradata는 null, 크기는 0이다. 입력도 CloseInput으로 정리한다.
+- 결과.xml에서 369~373행 covered=no를 확인했다. 기존 NEW_STREAM_FAILURE는 두 번째 스트림 생성에서 먼저 반환하므로 이 오류 분기를 검사하지 않는다.
+- TC-12에 복사 실패 모드를 추가해 실제 스트림 생성 이후 관리 바인딩 avcodec_parameters_copy에서 AVERROR(ENOMEM)을 반환하도록 하면 본 코드 수정 없이 제어 흐름을 시험할 수 있다. 이는 제품 실패 처리 주입 검증이며, FFmpeg 내부 extradata 할당 실패 자체를 재현했다는 의미는 아니다. 실제 FFmpeg 내부 실패까지 입증하려면 extradata가 있는 입력과 해당 할당 지점 제어가 별도로 필요하다.
+- 이번 검증은 소스·공식 구현 대조와 PowerShell XML 파싱이다. 코드 변경이나 새 동적 실패 주입, 빌드는 수행하지 않았다.
+
 ## TC-12 출력 스트림 생성 실패 구현
 
 - 사용자가 유사 검사에 추가하도록 승인했다. 기존 출력 할당 실패 Harness를 확장하고 두 번째 출력 스트림만 실패시키는 모드를 TC-12에 추가한다. 제품 코드는 유지한다.
