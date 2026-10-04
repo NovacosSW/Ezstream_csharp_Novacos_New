@@ -209,7 +209,7 @@ public sealed unsafe class SourceRecorder
                 // ---- 세그먼트 절단 판단 ----
                 bool intervalElapsed = (DateTime.UtcNow - segStart).TotalMilliseconds >= Interlocked.Read(ref _segmentMillis);
                 bool wantCut = intervalElapsed || _cutNow;
-                bool canCut = _videoInputIndex < 0 || (isVideo && isKey); // 비디오가 있으면 키프레임에서만 절단
+                bool canCut = isVideo && isKey; // 주 비디오의 키프레임에서만 절단
                 if (wantCut && canCut)
                 {
                     CoreLog.CuttingSegment(_logger, _source.SafePath,

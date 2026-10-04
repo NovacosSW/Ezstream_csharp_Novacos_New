@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## 도달 불가능한 비디오 없음 절단 조건 제거
+
+- 사용자가 실제 제품 조건 제거를 명시적으로 승인했다. 이는 시뮬레이터 재현을 위해 제품을 수정하지 말라는 기존 제한과 별개인 제품 정리 요청이다. canCut의 첫 항만 제거하며 초기화·비디오 검색·오디오 전용 입력 거부는 유지한다.
+- SourceRecorder 212행을 `bool canCut = isVideo && isKey;`로 변경하고 주 비디오 키프레임 기준임을 주석에 명시했다. 다른 제품 코드는 수정하지 않았다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug -p:CopyRetryCount=0`로 제품 3개와 Harness를 함께 빌드하고 CoverageTool도 동일 구성으로 빌드했다. 모두 경고 0·오류 0. `dotnet test tests/EzStream.Core.Tests/EzStream.Core.Tests.csproj -c Debug --filter 'Category!=Integration' -p:CopyRetryCount=0`는 27개 통과했다.
+- `dotnet run --project artifacts/cut-condition-removal/AudioProbe.csproj -c Debug` 임시 검증기로 1초 PCM WAV를 실제 RunOnce에 넣어 No recordable streams, CurrentFile null, RecordedBytes 0을 확인했다. 검증기 빌드에서 출력 문자열/날짜 포맷 분석 경고 2개가 있었으나 제품 빌드 경고는 아니다. 시험용 파일/폴더는 실행 후 제거했다.
+- 새 커버리지 세션에서 RECORDER_CUT_CONDITIONS, RECORDER_CLOSE_FAILURE, RECORDER_WRITE_FAILURE, RECORDER_LIFECYCLE, RECORDER_EAGAIN 모두 OK. artifacts/cut-condition-removal/result.xml에서 RunOnce 212행 covered=yes 확인. 제품/Harness DLL·PDB 6쌍 SHA256 일치 및 git diff --check 통과.
+- 전체 UI 시험 및 실제 RTSP 재연결/장시간 통합 시험은 이번에 실행하지 않았다. 기존 coverage는 이전 바이너리를 포함하므로 새 회차 수집 후 비교해야 한다. 사용자 소스/솔루션 변경은 별도로 보존한다.
+
 ## 비디오 없음 절단 조건 제거 영향 검토
 
 - 사용자는 조건 제거 시 문제 가능성 검토를 요청했다. 검토 대상은 canCut 식의 `_videoInputIndex < 0 ||`만이며 제품 및 시험 코드는 수정하지 않는다.
