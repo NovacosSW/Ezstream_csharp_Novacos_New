@@ -1,5 +1,12 @@
 # 조사 맥락
 
+## 기준 타임스탬프 삼항 연산 검토
+
+- 최신 tray-presence-check/service.xml에서 PreparePacketForOutput 547행 partial 확인. 행 단위 XML은 어느 피연산자가 미실행인지 직접 지정하지 않지만, 기존 TC-15는 둘 다 없는 패킷 또는 둘 다 있는 음수/역전 패킷만 구성하며 PTS만 있는 시험은 없다. DTS 정상 경로와 앞선 누락 return 실행을 종합하면 DTS 없음·PTS 있음 대체 경로가 빠진 것으로 판단한다.
+- 앞선 조건은 PTS와 DTS가 모두 없을 때만 반환한다. DTS만 없으면 유효한 PTS를 기준으로 세그먼트 시작 시간을 정하는 경로가 필요하다. 여기서 packet->dts만 사용하면 유효 PTS를 가진 입력의 기준 시각 설정을 잃는다. 삼항 선택은 DTS 생성이나 muxer 성공 보장까지 수행하는 기능은 아니다.
+- TC-15에서 input/output time_base=1/1000, segmentStartUs=NoPts, pts=1000, dts=AV_NOPTS_VALUE인 패킷으로 실제 helper를 호출하면 분기를 결정적으로 검사할 수 있다. 반환 true, segmentStartUs=1000000, pts=0, dts=AV_NOPTS_VALUE 유지, 출력 인덱스/pos 변환을 확인한다. 비교용 DTS 존재 케이스와 DTS만 존재하는 케이스도 포함 가능하다. FfmpegLoader 초기화 이후 수행해야 한다. 제품 수정이나 타이밍 경쟁은 필요 없다.
+- 이 경로는 도달 가능한 유효 입력 처리이므로 유지·시험 권장, 검사 제외 근거 없음. 현재 입력에서의 발생 빈도는 측정하지 않았다. 이번 요청에서는 소스·XML 검토만 수행했으며 시험 추가·빌드는 하지 않았다. 문서 변경은 git diff --check로 확인한다.
+
 ## 커버리지 중복 모듈 조사 및 빌드 동기화
 
 - 사용자의 캡처는 Service 2개·Core 2개·Tray 1개 모듈을 보여준다. SHA256 비교에서 src의 Core(47E2BD...)와 Harness 사본(4C55AD...), src의 Service(B98F7B...)와 Harness 사본(6D9B30...)이 다름을 확인했다. 현재 솔루션은 제품 3개만 포함하므로 제품 편집 후 솔루션만 빌드하면 Harness가 이전 제품 DLL로 시험한다. 사용자 소스 및 솔루션 변경은 보존한다.
