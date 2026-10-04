@@ -135,12 +135,15 @@ internal sealed class TcCoverageRunner
                 Step("시간 만료·키프레임 절단 조건 및 새 출력 실패", (progress, cancellationToken) =>
                     HarnessCoverageRunner.RunAsync("RECORDER_CUT_CONDITIONS",
                         "절단 조건·절단 보류 및 새 출력 열기 실패", progress, cancellationToken))),
-            [12] = Plan("미지원 코덱 및 출력 컨텍스트 할당 실패",
+            [12] = Plan("미지원 코덱 및 출력 컨텍스트·스트림 생성 실패",
                 Step("미지원 코덱", (progress, cancellationToken) =>
                     RunUnsupportedCodecWithFallbackAsync(runner, progress, cancellationToken)),
                 Step("출력 컨텍스트 할당 실패", (progress, cancellationToken) =>
                     HarnessCoverageRunner.RunAsync("ALLOC_OUTPUT_FAILURE",
-                        "출력 할당 실패·오류 로그·실패 알림 및 입력 정리", progress, cancellationToken))),
+                        "출력 할당 실패·오류 로그·실패 알림 및 입력 정리", progress, cancellationToken)),
+                Step("두 번째 출력 스트림 생성 실패", (progress, cancellationToken) =>
+                    HarnessCoverageRunner.RunAsync("NEW_STREAM_FAILURE",
+                        "출력 스트림 생성 실패·실패 알림 및 부분 생성 자원 정리", progress, cancellationToken))),
             [13] = Plan("입력 열기 및 스트림 분석 실패",
                 Step("존재하지 않는 입력", runner.RunMissingInputTestAsync),
                 Step("스트림 정보 검색 실패", CoverageTestRunner.RunStreamInfoFailureTestAsync)),

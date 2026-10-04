@@ -1,5 +1,6 @@
-// 출력 컨텍스트의 메모리 할당 실패를 주입해 오류 알림과 녹화 루프의 자원 정리를 검증한다.
+// 출력 컨텍스트 및 스트림 생성 실패를 주입해 오류 알림과 부분 생성 자원의 정리를 검증한다.
 using System.Reflection;
+using System.Runtime.InteropServices;
 using EzStream.Core.Config;
 using EzStream.Core.Ffmpeg;
 using EzStream.Core.Notifications;
@@ -12,23 +13,36 @@ namespace EzStream.CoverageHarness.Scenarios;
 
 internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
 {
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate AVStream* NewStream(AVFormatContext* context, AVCodec* codec);
+
+    private NewStream? _nativeNewStream;
     private SourceRecorder? _recorder;
     private int _calls;
     private int _errorLogs;
     private string? _loggedError;
 
-    public static bool Run()
+    public static bool Run(bool failNewStream = false)
     {
         var root = Path.Combine(Path.GetTempPath(), "ezstream-alloc-output-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
+        nint library = 0;
         try
         {
             var input = Path.Combine(root, "input.avi");
-            MjpegAviWriter.Create(input);
+            if (failNewStream) MjpegAviWriter.CreateWithTwoVideos(input);
+            else MjpegAviWriter.Create(input);
             var scenario = new RecorderAllocOutputFailureScenario();
             FfmpegLoader.Initialize(Path.Combine(AppContext.BaseDirectory, "ffmpeg"), "warning", scenario);
-            var binding = typeof(ffmpeg).GetField("avformat_alloc_output_context2_fptr", BindingFlags.Static | BindingFlags.NonPublic)
-                ?? throw new MissingFieldException("avformat_alloc_output_context2_fptr");
+            if (failNewStream)
+            {
+                library = NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "ffmpeg", "avformat-58.dll"));
+                scenario._nativeNewStream = Marshal.GetDelegateForFunctionPointer<NewStream>(
+                    NativeLibrary.GetExport(library, "avformat_new_stream"));
+            }
+            var bindingName = failNewStream ? "avformat_new_stream_fptr" : "avformat_alloc_output_context2_fptr";
+            var binding = typeof(ffmpeg).GetField(bindingName, BindingFlags.Static | BindingFlags.NonPublic)
+                ?? throw new MissingFieldException(bindingName);
             var original = binding.GetValue(null);
             var notices = new List<VideoSaveNotification>();
             var recorder = new SourceRecorder(
@@ -37,8 +51,9 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
             scenario._recorder = recorder;
             try
             {
-                var method = typeof(RecorderAllocOutputFailureScenario).GetMethod(nameof(FailAllocation),
-                    BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(nameof(FailAllocation));
+                var methodName = failNewStream ? nameof(FailSecondStream) : nameof(FailAllocation);
+                var method = typeof(RecorderAllocOutputFailureScenario).GetMethod(methodName,
+                    BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(methodName);
                 binding.SetValue(null, Delegate.CreateDelegate(binding.FieldType, scenario, method));
                 Field("_running").SetValue(recorder, true);
                 var run = typeof(SourceRecorder).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -46,13 +61,15 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
                 run.Invoke(recorder, null);
                 var status = recorder.Snapshot();
                 var error = FfmpegLoader.ErrorString(ffmpeg.AVERROR(ffmpeg.ENOMEM));
-                Require(scenario._calls == 1 && status.LastError == "alloc_output: " + error,
-                    "출력 컨텍스트 할당 실패 상태를 확인하지 못했습니다.");
-                Require(scenario._errorLogs == 1 && scenario._loggedError?.Contains(error, StringComparison.Ordinal) == true,
-                    "출력 컨텍스트 할당 실패 로그를 확인하지 못했습니다.");
+                Require(scenario._calls == (failNewStream ? 2 : 1)
+                    && status.LastError == (failNewStream ? "new_stream failed" : "alloc_output: " + error),
+                    "출력 준비 실패 상태를 확인하지 못했습니다.");
+                if (!failNewStream)
+                    Require(scenario._errorLogs == 1 && scenario._loggedError?.Contains(error, StringComparison.Ordinal) == true,
+                        "출력 컨텍스트 할당 실패 로그를 확인하지 못했습니다.");
                 Require(notices.Count == 1 && !notices[0].Success && notices[0].FileSizeBytes == 0
                     && notices[0].Error == status.LastError && notices[0].FilePrefix == "alloc-output",
-                    "출력 컨텍스트 할당 실패 알림이 예상과 다릅니다.");
+                    "출력 준비 실패 알림이 예상과 다릅니다.");
                 Require(status.State == "STOPPED" && status.CurrentFile is null && status.RecordedBytes == 0
                     && !Directory.EnumerateFiles(root, "*.mp4", SearchOption.AllDirectories).Any(),
                     "할당 실패 후 출력 생성이 중단되지 않았습니다.");
@@ -69,7 +86,32 @@ internal sealed unsafe class RecorderAllocOutputFailureScenario : ILogger
             Require(ReferenceEquals(binding.GetValue(null), original), "출력 할당 바인딩 복원 실패");
             return true;
         }
-        finally { Directory.Delete(root, recursive: true); }
+        finally
+        {
+            if (library != 0) NativeLibrary.Free(library);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private AVStream* FailSecondStream(AVFormatContext* context, AVCodec* codec)
+    {
+        // 입력/출력 준비는 계속 실행하되 실패 후 자동 재시도만 중단한다.
+        Field("_running").SetValue(_recorder, false);
+        Require(context != null && context->oformat != null
+            && context == (AVFormatContext*)Pointer.Unbox(Field("_oc").GetValue(_recorder)!),
+            "실제 출력 컨텍스트가 준비되지 않았습니다.");
+        _calls++;
+        if (_calls == 1)
+        {
+            Require(context->nb_streams == 0, "첫 출력 스트림 생성 전 상태가 예상과 다릅니다.");
+            var stream = _nativeNewStream!(context, codec);
+            Require(stream != null && context->nb_streams == 1, "첫 출력 스트림 실제 생성 실패");
+            return stream;
+        }
+        Require(_calls == 2 && context->nb_streams == 1
+            && context->streams[0]->codecpar->codec_type == AVMediaType.AVMEDIA_TYPE_VIDEO,
+            "첫 비디오 스트림 설정 후 두 번째 생성에 도달하지 못했습니다.");
+        return null;
     }
 
     private int FailAllocation(AVFormatContext** context, AVOutputFormat* outputFormat, string format, string filename)

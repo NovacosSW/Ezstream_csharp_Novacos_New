@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## TC-12 출력 스트림 생성 실패 구현
+
+- 사용자가 유사 검사에 추가하도록 승인했다. 기존 출력 할당 실패 Harness를 확장하고 두 번째 출력 스트림만 실패시키는 모드를 TC-12에 추가한다. 제품 코드는 유지한다.
+- NEW_STREAM_FAILURE는 두 비디오 AVI를 사용하고 avformat_new_stream의 관리 바인딩만 교체한다. 첫 호출은 원본 avformat-58.dll 함수로 실행하여 스트림 1개 생성을 확인한다. 두 번째는 첫 비디오 codecpar 설정 및 출력 컨텍스트 동일성을 확인하고 null을 반환한다. 실패 이후 재시도만 중단하고 실제 Run finally를 실행한다.
+- 오류 상태 new_stream failed, 실패 저장 알림 정확히 1개(크기 0), MP4 미생성, STOPPED, 입출력 컨텍스트 null, 입력 파일 배타적 재열기와 바인딩 복원을 검증한다. 두 번째 실패 직전 실제 첫 스트림 존재를 확인하고 제품의 avformat_free_context 경로를 거친다. 네이티브 메모리 누수 계측 도구를 추가로 실행한 것은 아니다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션 CoverageTool 빌드 성공. 모두 경고/오류 0개.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe NEW_STREAM_FAILURE`와 ALLOC_OUTPUT_FAILURE를 각각 실행하여 둘 다 통과했다. artifacts/new-stream-integration/result.xml에서 OpenNewSegmentCore 361/363/364/365행 및 기존 339~344행 모두 covered=yes를 확인했다. const 선언 362행은 실행 range가 없다.
+- 제품 파일 53개 SHA256 불변, git diff --check 통과. 새 단계는 TC-12 및 전체 TC-01~19 실행에 포함되며 전체 UI 시험 자체는 재실행하지 않았다.
+
 ## 출력 스트림 생성 실패 검토
 
 - 사용자가 outStream==null 블록 검토를 요청했다. 이번에는 제품·시뮬레이터 코드를 수정하지 않는다.
