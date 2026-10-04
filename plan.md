@@ -14,3 +14,7 @@
 1. Harness 프로젝트와 참조 Core/Service/Tray를 Rebuild하고 CoverageTool도 Rebuild한다.
 2. Service/Tray/Harness의 Core DLL/PDB 식별자와 해시 일치를 확인한다.
 3. Core 단위 테스트와 새 세션의 최소 커버리지 수집을 검증한다.
+
+## PipeServer 미달성 검토
+
+`결과.xml`의 AcceptLoop 미달성 범위를 소스와 대조하고 운영상 발생 조건, 재현 가능성, 검사 제외 타당성을 판단한다. 기존 Harness와 공식 .NET 구현을 확인하고 안전한 기존 시나리오로 검증한다. 제품 코드나 검사 제외 설정은 변경하지 않는다.

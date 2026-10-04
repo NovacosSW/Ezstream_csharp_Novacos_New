@@ -48,3 +48,32 @@ Service/Tray/Harness를 같은 빌드에서 생성하고 Core DLL/PDB를 함께 
 - Service/Tray/Harness의 Core DLL/PDB GUID가 모두 `4a850fd2-875c-43e4-af4c-1dbede7f4d65`로 일치하고 DLL/PDB 각각의 SHA256도 세 폴더에서 동일하다. 증거는 `artifacts/core-coverage-rebuild/symbol-check.json`이다.
 - `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/core-coverage-rebuild/retention.xml -f xml tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RETENTION_ZERO` 성공. Core 6개 블록 수집을 확인했다. 0.44%는 이 최소 시나리오만의 값이다.
 - 실행 파일은 `tools/EzStream.CoverageTool/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageTool.exe`이다. 기존 deliverables/ZIP은 이번 개발 빌드 대상이 아니다. 전체 시뮬레이터 시험은 아직 실행하지 않았으며 새로 빌드된 도구에서 새 전체시험 회차로 진행해야 한다.
+
+## PipeServer 검토 시작
+
+- 사용자가 루트 `결과.xml` 기준으로 AcceptLoop 미달성 예외 경로의 현실성, 제외 및 재현 가능성을 요청했다. 확률을 산출할 운영 통계는 없으므로 조건 기반 정성 평가로 설명한다.
+- 기존 `EzStream.sln` 변경은 보존한다. 검사 제외나 제품 코드 변경은 이번 검토 범위에 포함하지 않는다.
+
+## PipeServer 검토 결과
+
+- `결과.xml`의 PipeServer 소스 SHA256은 현재 파일과 동일하다. `AcceptLoop` 상태 머신은 블록 29/32(90.63%), 줄 87.50%이며 미달성 줄은 49, 56, 61이다.
+- 49행은 연결/요청 대기 중 취소를 정상 종료로 처리하는 경로다. `Stop()`이 토큰을 취소하고 Worker.StopAsync가 이를 호출한다. 정상 서비스 종료에서도 충분히 발생하므로 희귀 장애나 도달 불가 코드로 제외하는 것은 부적절하다.
+- 56/61행은 별도의 예외가 아니라 일반 예외 이후 500ms 지연이 취소 없이 완료되어 재시도하는 경로의 닫는 중괄호 위치다. 클라이언트가 응답을 받기 전에 연결을 끊으면 실제 IOException이 발생한다. 장애 빈도는 통계 없이는 수치화할 수 없으나, 오류 후 서비스가 계속 동작하면 자연스럽게 실행되는 복구 경로다.
+- 기존 `RunPipeAcceptFailure`는 로그에서 오류 확인 즉시 `pipe.Stop()`을 호출하여 지연 중 취소(57~59행)를 달성하지만, 지연 완료와 재시도는 검증하지 않는다. 이 테스트 설계가 해당 미달성과 일치한다.
+- 50행 예외 필터, 52행 오류 로그, 55행 지연 진입, 57~59행 지연 중 취소, 64행 DisposeAsync는 기존 XML에서 이미 달성이다. 이번 미달성은 OOM/StackOverflow/AccessViolation 재현 문제가 아니다. 치명적 예외 필터의 모든 논리 분기가 검증되었다고 단정할 수는 없으며, 보고서 수치는 블록/줄 커버리지다.
+- CreateServer는 try 밖이고 DisposeAsync는 finally 안이므로 여기에서 발생한 예외를 일반 catch가 처리한다고 해석하면 안 된다. 이번 미달성 원인과는 별개다.
+
+## PipeServer 실제 재현 및 한계
+
+- 제품 DLL을 참조하는 임시 실행기를 `artifacts/pipe-accept-review/Program.cs`에 작성했다. 비공개 AcceptLoop를 reflection으로 호출하되 실제 Named Pipe와 CancellationToken을 사용했으며 강제로 예외를 던지거나 제품 소스를 바꾸지 않았다. 녹화 엔진은 시작하지 않고 상태 조회만 했다.
+- `dotnet build artifacts/pipe-accept-review/Probe.csproj -c Debug --no-restore -p:EnableNETAnalyzers=false` 성공, 경고/오류 0개. 임시 실행기의 스타일 분석만 끈 것으로 제품이나 커버리지 제외 설정과 무관하다.
+- 처음 격리 환경 실행은 cancel-wait 통과 후 클라이언트 연결 권한 거부로 실패했다. 로컬 파이프 접근을 허용한 재실행은 아래 두 시나리오 모두 성공했다.
+- `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/pipe-accept-review/reproduced.xml -f xml artifacts/pipe-accept-review/bin/Debug/net9.0-windows/Probe.exe` 성공.
+  - `PASS cancel-wait`. 연결 대기 중 취소 후 루프가 정상 완료했다.
+  - `Observed: IOException: Pipe is broken.` 이후 750ms 기다린 뒤 재접속하고 GET_STATUS 응답 OK를 검증했다. `PASS disconnect-retry`.
+- 원본과 재현 XML의 Service 모듈 ID는 모두 `3815D4DD81B40E42B7CB94C5745E4F38D59C9592`다. 재현 결과에서 49/56/61행이 모두 covered=yes이며 AcceptLoop 블록은 31/32(96.88%)다. 재현 시험만으로는 기존 시험이 달성한 지연 중 취소 경로가 빠지므로 단독 100%는 아니다.
+- `dotnet-coverage merge 결과.xml artifacts/pipe-accept-review/reproduced.xml -o artifacts/pipe-accept-review/combined.xml -f xml` 성공. 병합 결과 AcceptLoop 줄 커버리지 100%. XML 재입력 병합은 블록 수를 0/0으로 출력하므로 이 파일의 블록 백분율은 판단 근거로 쓰지 않는다. 원본 결과.xml은 보존했다.
+- 권장 사항은 제외가 아니라 정식 Harness에 연결 대기 중 정상 종료 시험과 오류 후 재접속 성공 시험을 별도로 추가하는 것이다. 현재 검토에서는 정식 Harness 변경을 하지 않았다. 실제 운영 장애 확률 및 장시간 반복 안정성은 검증하지 않았다.
+- 공식 API 근거.
+  - https://learn.microsoft.com/en-us/dotnet/api/system.io.pipes.namedpipeserverstream.waitforconnectionasync?view=net-9.0
+  - https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task.delay?view=net-9.0
