@@ -1,5 +1,16 @@
 # 조사 맥락
 
+## 출력 컨텍스트 할당 실패 검토
+
+- 사용자 요청은 OpenNewSegmentCore의 alloc_output 오류 블록 검토다. 제품 및 시뮬레이터 코드를 변경하지 않고 FFmpeg 실제 구현과 비교한다.
+- FFmpeg n4.4 libavformat/mux.c 127~182행을 확인했다. avformat_alloc_context, muxer private data 할당, filename 복제 실패는 AVERROR(ENOMEM), 출력 형식 탐색 실패는 AVERROR(EINVAL)을 반환한다. https://github.com/FFmpeg/FFmpeg/blob/n4.4/libavformat/mux.c . 이 단계에는 실제 파일 열기/쓰기 작업이 없다.
+- 제품은 oformat=null, format="mp4"를 고정 전달한다. 현재 MP4 기록이 가능한 동일 배포 DLL에서 형식 미지원 실패는 통상 발생하지 않지만, MP4 muxer가 빠진 DLL로 교체되면 가능하다. 네이티브 메모리 할당 실패는 여전히 가능하며 .NET OutOfMemoryException이 아니라 음수 오류 반환이다. 일반 운영 발생 확률을 수치화할 근거는 없다.
+- ret 검사 제거 시 실패 결과 _oc=null로 다음 스트림 생성/네이티브 호출을 진행할 수 있으므로 유지해야 한다. 오류 상태·CannotAllocateOutput 로그·실패 저장 알림(FileSizeBytes=0)·false 반환은 일관적이다. 실행 중이면 상위 Run에서 입력을 정리하고 재시도한다.
+- 사용 버전의 FFmpeg 함수는 처음에 *avctx=NULL로 설정하고 실패 시 내부 컨텍스트를 해제한 뒤 음수를 반환한다. 따라서 기존 "실패 시 oc가 남아 있을 수" 주석은 이 구현의 실제 실패 경로와 맞지 않는다. _oc=oc 대입은 성공 컨텍스트 소유권 이전에 필요하며 현재 코드 오류를 의미하지는 않는다. 주석/본 코드는 수정하지 않았다.
+- 결과.xml의 OpenNewSegmentCore 339~344행 covered=no를 확인했다. 도구의 기존 CannotAllocateOutput 직접 로그 호출은 해당 실패 블록 재현이 아니다.
+- 판정은 발생 가능한 네이티브 자원 오류이므로 도달 불가능으로 제외할 수 없으며 유지·오류 주입 시험을 권장한다. 별도 Harness에서 avformat_alloc_output_context2 바인딩만 *context=null 및 AVERROR(ENOMEM)으로 반환하도록 하면 본 코드 수정 없이 시험 가능하다. 실제 메모리 고갈 없이 상태·로그·실패 알림·출력 미생성·입력 정리를 확인하는 방법이다. TC-12의 출력 준비 실패 시험과 함께 연결 가능하다.
+- 검증은 소스 및 공식 FFmpeg 구현 대조와 PowerShell XML 파싱이다. 이번에는 새 동적 재현·빌드를 하지 않았고 코드 변경은 없다.
+
 ## TC-13 실제 스트림 분석 실패 시험 구현
 
 - 사용자 승인에 따라 STREAM_INFO_FAILURE를 실제 입력 열기 후 분석 실패 주입으로 교체한다. 제품 소스/제품 DLL은 수정하지 않고 Harness 및 연결 설명만 수정한다.
