@@ -1,5 +1,22 @@
 # 조사 맥락
 
+## Host 정상 종료 시험 구현 시작
+
+- 사용자가 유사 시험과 함께 실행하도록 요청하여 TC-20에 정상 Host 종료 시나리오를 추가한다. 실제 서비스/비콘솔 시험 종료 후 실행해 파이프 충돌을 피한다.
+- 실제 Program 엔트리포인트를 호출하고 HostBuilt 진단 이벤트로 정상 종료를 요청한다. Worker를 대체하거나 제품에 테스트 종료 옵션을 추가하지 않는다. 기존 서비스 세션으로 수집하므로 새 병합 파일은 필요하지 않다.
+
+## Host 정상 종료 시험 구현 결과
+
+- ServiceHostCoverageScenario가 Service 어셈블리의 실제 EntryPoint를 실행한다. HostBuilt에서 IHostApplicationLifetime을 얻고 ApplicationStarted 콜백에서 StopApplication을 요청한다. ApplicationStarted/ApplicationStopped 및 EntryPoint 정상 반환을 모두 확인해야 성공이다.
+- 실행 제한은 15초이며 시간 초과 시에도 관찰한 Host에 정상 종료를 요청하고 실패 처리한다. 진단 이벤트 구독과 토큰 등록은 시험 종료 시 해제한다.
+- TC-20의 기존 비콘솔 시험 다음, IPC 복구 시험 전에 SERVICE_HOST_LIFECYCLE을 실행한다. 기존 Service 세션에 연결되어 최종 service.coverage에 포함된다. Program/Worker 제품 코드는 변경하지 않았다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore` 성공, 경고/오류 0개.
+- `dotnet build tools/EzStream.CoverageTool/EzStream.CoverageTool.csproj -c Debug --no-restore -p:CopyRetryCount=0` 성공, 경고/오류 0개.
+- `dotnet-coverage collect --settings tools/EzStream.CoverageTool/Coverage.runsettings -o artifacts/host-lifecycle-update/host.coverage -f coverage tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe SERVICE_HOST_LIFECYCLE` 성공. Program 25/26행 모두 covered=yes.
+- 고유 시험 세션을 `collect --server-mode --background`로 시작하고 `connect <session> <Harness.exe> SERVICE_HOST_LIFECYCLE`, `connect <session> <Harness.exe> PIPE_ACCEPT_FAILURE`를 실행했다. 둘 다 OK. snapshot 후 shutdown하여 시험 세션을 종료했다. snapshot.xml에서 Run 달성과 AcceptLoop 블록/줄 100% 확인.
+- 기존 Results/service.coverage와 새 snapshot.coverage를 별도 artifacts/host-lifecycle-update/combined.coverage로 바이너리 병합 후 XML 변환했다. Program과 AcceptLoop 모두 블록 32/32 및 줄 100%다. 기존 결과 및 결과.xml은 변경하지 않았다.
+- `git diff --check` 통과. 전체 TC-20 UI 흐름/SCM 서비스 중지는 직접 실행하지 않았다. 검증 당시 기존 설정의 sources는 0개였고 실제 Host는 시작 직후 정상 종료했다. 개발 Debug 실행파일을 갱신했으며 ZIP/배포본은 이번 대상이 아니다.
+
 ## Program Build/Run 검토
 
 - 결과.xml의 Program.cs SHA256 `408DC3428961243E407262D9D3EE2830B45C3C921DFD40DD9B54D96A126A07FD`가 현재 소스와 일치한다. XML 파싱 및 Get-FileHash로 확인했다.

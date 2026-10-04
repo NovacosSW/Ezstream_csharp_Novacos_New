@@ -162,6 +162,9 @@ internal sealed class TcCoverageRunner
                 Step("Service 종료 전 결과 저장", CoverageSessionFinalizer.SnapshotServiceCheckpointAsync),
                 Step("실제 Service 실행 종료", ProductSessionLauncher.StopServiceForFinalCoverageAsync),
                 Step("Service 비콘솔 모드", ProductSessionLauncher.RunServiceWithoutConsoleForCoverageAsync),
+                Step("Service Host 정상 종료 및 Run 반환", (progress, cancellationToken) =>
+                    HarnessCoverageRunner.RunAsync("SERVICE_HOST_LIFECYCLE",
+                        "실제 Service Program의 Host 정상 종료", progress, cancellationToken)),
                 Step("IPC 연결 중단 복구 및 대기 취소", CoverageTestRunner.RunPipeAcceptFailureTestAsync),
                 Step("Service 결과 저장·종료", CoverageSessionFinalizer.FinalizeServiceAsync)),
             [21] = Plan("서비스 미연결 상태의 트레이 기능",

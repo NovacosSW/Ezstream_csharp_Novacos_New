@@ -41,6 +41,7 @@ internal static class Program
                 "RESIDUAL_BRANCHES" => HasText(ServiceCoverageScenarios.RunResidualBranches()),
                 "PIPE_ACCEPT_FAILURE" => HasText(ServiceCoverageScenarios.RunPipeAcceptFailure()),
                 "SERVICE_LIFECYCLE" => HasText(ServiceCoverageScenarios.RunServiceLifecycle()),
+                "SERVICE_HOST_LIFECYCLE" => HasText(ServiceHostCoverageScenario.Run()),
                 "WORKER_START_FAILURE" => HasText(ServiceCoverageScenarios.RunWorkerStartFailure()),
                 "RETENTION_ZERO" => RecorderCoverageScenarios.RunRetentionZero(),
                 "RETENTION_MISSING_PATHS" => RecorderCoverageScenarios.RunRetentionMissingPaths(),

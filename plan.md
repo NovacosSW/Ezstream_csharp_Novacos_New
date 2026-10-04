@@ -26,3 +26,7 @@
 ## Host 시작 및 종료 검토
 
 Program.cs의 Build/Run 커버리지를 결과.xml과 대조하고 .NET 9 Host 수명주기 구현 및 시뮬레이터 종료 방식을 확인한다. 미달성의 의미와 정상 종료 재현 방법을 판단하며 제품 코드는 변경하지 않는다.
+
+## Host 정상 종료 시험 통합
+
+TC-20에서 기존 Service 프로세스 종료 뒤 실제 Service 엔트리포인트를 Harness에서 실행한다. .NET Host 진단 이벤트로 생성된 Host를 관찰하고 시작 완료 후 StopApplication을 요청하여 Run의 정상 반환과 ApplicationStopped를 검증한다. 기존 Service 수집 세션에 연결해 결과에 포함하며 제품 Program은 변경하지 않는다. 빌드와 실제 수집으로 Program 및 기존 IPC 시험을 확인한다.
