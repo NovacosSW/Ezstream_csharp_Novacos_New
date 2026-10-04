@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## TC-11 파일 크기 조회 경쟁 시험 구현
+
+- 사용자 요청에 따라 시뮬레이터에 추가한다. 임시 파일을 두 이름 사이에서 이동해 존재 검사와 크기 조회 사이 실제 파일 소실을 유도한다. 5초 내 미재현은 명시적인 시험 실패이며 제품 결함으로 단정하지 않는다. 본 코드 수정이나 시스템 파일 API 가로채기는 사용하지 않는다.
+- RecorderFileInfoCoverageScenario는 전용 4바이트 임시 파일로 정상 크기·누락 파일 알림을 먼저 확인한다. 파일 이동 작업과 실제 ReportClosedSegment를 병행해 file_info 오류, Success=false, FileSizeBytes=0 및 세그먼트 상태 초기화를 검사한다. finally에서 이동 작업을 종료·대기한 뒤 두 임시 경로와 전용 디렉터리를 정리한다. TC-11의 별도 단계로 연결해 기존 절단 시험 제한 시간에 더해지지 않도록 했다. 전체 TC01~19 순회에 포함되며 전체 UI 버튼 자체는 실행하지 않았다.
+- Harness 첫 빌드는 CA1508 분석기가 리플렉션 호출의 콜백 대입을 추적하지 못해 실패했다. 기존 방식과 같은 알림 List 수집 후 Single로 검증하도록 수정했고 분석기 억제 없이 해결했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool 동일 명령 모두 경고 0·오류 0으로 통과했다.
+- `EzStream.CoverageHarness.exe RECORDER_FILE_INFO_RACE` 연속 5회, `dotnet-coverage connect <session> <Harness.exe> RECORDER_FILE_INFO_RACE` 연속 3회 모두 OK. 수집 XML `artifacts/file-info-integration/result.xml`에서 GetFileSize 491~493행 covered=yes 확인. 필터 제외 예외 3종은 시험하지 않는다.
+- 제품 소스·DLL·PDB 53개 SHA256이 실행 전후 동일하며 git diff --check 통과. 테스트 성공률 8/8은 이 환경의 관측 결과이며 다른 환경에서 재현 보장이나 운영 장애 발생 확률을 의미하지 않는다. 루트 결과.xml은 덮어쓰지 않았다.
+
 ## 파일 크기 조회 예외 검토
 
 - GetFileSize catch 검토 요청이다. 제품 및 시뮬레이터 코드는 수정하지 않는다.

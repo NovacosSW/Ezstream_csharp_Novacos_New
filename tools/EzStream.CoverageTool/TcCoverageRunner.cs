@@ -134,7 +134,10 @@ internal sealed class TcCoverageRunner
                 Step("세그먼트 절단", runner.RunSegmentCutTestAsync),
                 Step("절단 조건 및 출력 열기·트레일러 오류 반환·관리 예외", (progress, cancellationToken) =>
                     HarnessCoverageRunner.RunAsync("RECORDER_CUT_CONDITIONS",
-                        "절단 조건·출력 열기 실패·트레일러 오류 반환·관리 예외 보고", progress, cancellationToken))),
+                        "절단 조건·출력 열기 실패·트레일러 오류 반환·관리 예외 보고", progress, cancellationToken)),
+                Step("파일 크기 조회 예외(경쟁 시험)", (progress, cancellationToken) =>
+                    HarnessCoverageRunner.RunAsync("RECORDER_FILE_INFO_RACE",
+                        "파일 크기 조회 예외·실패 알림(5초 내 미재현 시 재시험)", progress, cancellationToken))),
             [12] = Plan("미지원 코덱 및 출력 준비 실패",
                 Step("미지원 코덱", (progress, cancellationToken) =>
                     RunUnsupportedCodecWithFallbackAsync(runner, progress, cancellationToken)),
