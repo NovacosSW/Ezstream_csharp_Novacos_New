@@ -1,4 +1,4 @@
-// 시험 프로세스에서만 FFmpeg 읽기 바인딩을 교체해 EAGAIN 후 녹화 복구를 검증한다.
+// 시험 프로세스에서만 FFmpeg 읽기 바인딩을 교체해 EAGAIN과 잘못된 인덱스 이후 녹화 복구를 검증한다.
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -20,6 +20,7 @@ internal sealed unsafe class RecorderEagainCoverageScenario
 
     private readonly ReadFrame _nativeRead;
     private int _injected;
+    private int _invalidIndices;
     private int _packets;
 
     private RecorderEagainCoverageScenario(ReadFrame nativeRead) => _nativeRead = nativeRead;
@@ -59,8 +60,9 @@ internal sealed unsafe class RecorderEagainCoverageScenario
                     InvokeRecorder(recorder, "RunOnce");
                     var status = recorder.Snapshot();
                     output = status.CurrentFile;
-                    if (scenario._injected != 1 || scenario._packets == 0 || status.RecordedBytes <= 0)
-                        throw new InvalidOperationException("EAGAIN 이후 정상 패킷 기록을 확인하지 못했습니다.");
+                    if (scenario._injected != 1 || scenario._invalidIndices != 2
+                        || scenario._packets == 0 || status.RecordedBytes <= 0)
+                        throw new InvalidOperationException("EAGAIN 및 인덱스 오류 이후 정상 패킷 기록을 확인하지 못했습니다.");
                 }
                 finally
                 {
@@ -75,8 +77,8 @@ internal sealed unsafe class RecorderEagainCoverageScenario
                 var savedPackets = CountSavedPackets(output
                     ?? throw new InvalidOperationException("저장된 MP4 경로가 없습니다."));
                 if (savedPackets != scenario._packets)
-                    throw new InvalidOperationException("EAGAIN 이후 저장 MP4의 패킷 수가 일치하지 않습니다.");
-                return $"EAGAIN 1회 후 {savedPackets}개 패킷 녹화·MP4 재읽기·바인딩 복원 확인";
+                    throw new InvalidOperationException("잘못된 인덱스 패킷 제외 후 저장 MP4의 패킷 수가 일치하지 않습니다.");
+                return $"EAGAIN 1회·인덱스 오류 2회 후 {savedPackets}개 패킷 녹화·MP4 재읽기·바인딩 복원 확인";
             }
             finally
             {
@@ -97,7 +99,19 @@ internal sealed unsafe class RecorderEagainCoverageScenario
             return ffmpeg.AVERROR(ffmpeg.EAGAIN);
         }
         var result = _nativeRead(context, packet);
-        if (result >= 0) _packets++;
+        if (result >= 0)
+        {
+            if (_invalidIndices < 2)
+            {
+                // 고정 AVI 입력의 스트림 수는 세그먼트 생성 시 매핑 길이와 같다.
+                packet->stream_index = _invalidIndices == 0 ? -1 : checked((int)context->nb_streams);
+                _invalidIndices++;
+            }
+            else
+            {
+                _packets++;
+            }
+        }
         return result;
     }
 

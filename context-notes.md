@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## 입력 인덱스 시뮬레이터 구현
+
+- 사용자 승인에 따라 기존 RECORDER_EAGAIN 시험을 확장한다. 고정 단일 비디오 AVI에서 네이티브 읽기 성공 패킷 두 개의 인덱스를 -1과 nb_streams(매핑 길이)로 바꾼다. 실제 스트림 추가가 아닌 오류 주입 시험이다.
+- 비정상 패킷 2개가 정상 저장 패킷 수에 포함되지 않고 이후 정상 녹화가 이어지는지 저장 MP4 재읽기로 검증한다. 제품 코드와 기존 사용자 변경은 유지한다.
+- Harness와 Tool 각각 `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0`, `dotnet build tools/EzStream.CoverageTool/EzStream.CoverageTool.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 성공. 모두 경고/오류 0개.
+- 별도 collector 서버 세션에서 `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RECORDER_EAGAIN` 통과. EAGAIN 1회와 인덱스 오류 2회 주입, 후속 정상 기록, 정상 패킷 수와 저장 MP4 재읽기 수 일치, 바인딩 복원을 시나리오에서 검증했다.
+- artifacts/index-integration/result.xml을 XML로 파싱해 RunOnce 185/186/187/199/201/202/203행의 모든 range가 covered=yes임을 검사했다. 기존 199행 partial이 해소됐다.
+- 제품 소스 및 기존 제품 DLL/PDB 등 53개 파일 SHA256 불변 확인. git diff --check 통과. TC-14 및 이를 호출하는 전체 UI 시험에 포함되며, 전체 UI 시험 자체는 이번에 재실행하지 않았다.
+
 ## 입력 스트림 인덱스 검토 시작
 
 - 사용자는 SourceRecorder 199행의 삼항식 검토를 요청했다. 코드 변경 승인으로 확대하지 않고 현재 매핑 수명과 FFmpeg 계약을 검토한다.
