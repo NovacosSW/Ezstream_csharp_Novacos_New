@@ -1,5 +1,16 @@
 # 조사 맥락
 
+## 출력 트레일러 쓰기 실패 검토
+
+- 사용자 요청은 CloseOutput의 av_write_trailer 음수 반환 블록 검토다. 제품·시뮬레이터 코드는 변경하지 않고 반환 오류와 후속 정리를 확인한다.
+- FFmpeg n4.4 mux.c의 av_write_trailer는 남은 필터/인터리브 패킷 기록, muxer 트레일러, 출력 flush 및 pb->error를 통해 음수 오류를 반환할 수 있다. 네이티브 음수 반환은 C# 예외가 아니므로 뒤의 catch로 대체할 수 없다. https://github.com/FFmpeg/FFmpeg/blob/n4.4/libavformat/mux.c .
+- 제품은 movflags=+faststart를 설정한다. movenc.c에서 트레일러 중 moov 이동을 위한 추가 버퍼 할당 및 출력 파일 읽기 재열기를 수행하고 실패를 전파한다. 따라서 기존 패킷 쓰기가 성공했어도 종료 시 쓰기/장치 I/O 오류, 메모리 부족, faststart 재열기 실패가 가능하다. https://github.com/FFmpeg/FFmpeg/blob/n4.4/libavformat/movenc.c . 정상 운영 발생 확률을 수치화할 자료는 없다.
+- closeError 기록 후에도 avio_closep와 avformat_free_context로 정리를 계속하는 흐름은 적절하다. ReportClosedSegment가 closeError를 받아 파일 크기가 양수여도 Success=false 및 write_trailer 오류를 보고한다. 이 검사를 제거하면 파일이 존재한다는 이유로 저장 성공으로 잘못 알릴 수 있다. 유지 및 시험 권장, 도달 불가능 제외 대상 아님.
+- 이 경로는 SetError를 호출하지 않으므로 SourceStatus.LastError 갱신은 하지 않는다. 실제 검증 기준은 WriteTrailerReturnedError 로그와 저장 실패 알림이어야 한다. closeError는 기존 _segmentWriteError보다 트레일러 오류를 우선하며 avio_close 오류는 closeError가 없을 때만 기록한다.
+- 결과.xml에서 CloseOutput 435~438행 미실행을 확인했다. 기존 ServiceCoverageScenarios의 로그 함수 직접 호출은 이 블록 재현이 아니다.
+- 시뮬레이터만으로 재현 가능하다. TC-11 녹화 종료/절단 시험에서 실제 MP4 기록을 수행한 뒤 별도 Harness의 av_write_trailer 관리 바인딩을 제어해 음수 반환을 주입한다. 원래 함수를 실행해 내부 종료 작업을 마친 뒤 성공 반환값을 오류로 바꾸는 방식은 제품 오류 처리 시험이며 실제 손상 파일/디스크 장애 재현과 구분한다. 로그·실패 알림·파일 잠금 해제·컨텍스트 정리 및 바인딩 복원을 확인하면 된다.
+- 이번에는 제품 소스·FFmpeg 구현과 PowerShell XML 파싱으로 검토했으며 새 시험 또는 빌드는 수행하지 않았다.
+
 ## TC-12 코덱 파라미터 복사 실패 구현
 
 - 사용자 승인에 따라 TC-12에 복사 실패를 추가한다. 제품은 유지하고 시험 프로세스의 복사 바인딩만 ENOMEM을 반환하도록 제어한다. 실제 메모리 고갈 재현은 아니다.
