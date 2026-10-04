@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## TC-13 실제 스트림 분석 실패 시험 구현
+
+- 사용자 승인에 따라 STREAM_INFO_FAILURE를 실제 입력 열기 후 분석 실패 주입으로 교체한다. 제품 소스/제품 DLL은 수정하지 않고 Harness 및 연결 설명만 수정한다.
+- RecorderStreamInfoFailureScenario에서 실제 AVI를 열고 avformat_find_stream_info 바인딩만 AVERROR_INVALIDDATA를 반환하도록 교체한다. 입력 컨텍스트/pb/스트림 존재를 확인한다. 첫 실패 후 자동 재시도만 중단하기 위해 시험 콜백에서 _running=false로 설정하고 실제 Run의 finally를 실행한다.
+- LastError의 정확한 find_stream_info 오류, CannotFindStreamInfo 이벤트 28의 Error 로그 1회와 오류 문자열, 출력 디렉터리·파일·저장 알림 미생성, STOPPED, _ic=null 및 입력 파일의 배타적 재열기를 검증한다. 바인딩은 finally에서 복원하고 원본 동일성을 확인한다. 로그만 직접 부르던 두 기존 보조 메서드는 교체 후 삭제했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션의 CoverageTool 빌드 성공. 경고/오류 0개.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe STREAM_INFO_FAILURE` 통과. artifacts/stream-info-integration/result.xml의 OpenInput 272/273/274/275행 모두 covered=yes를 검사했다.
+- 제품 소스 및 기존 제품 DLL/PDB 등 53개 SHA256 불변 확인, git diff --check 통과. 기존 TC-13 경로를 교체했으므로 전체 TC-01~19 실행에 포함된다. 전체 UI 시험과 실제 손상 파일·네트워크 장애 자체의 재현은 이번 검증 범위가 아니다.
+
 ## 입력 스트림 정보 분석 실패 검토
 
 - 사용자가 OpenInput의 find_stream_info 실패 블록 검토를 요청했다. 제품 및 시뮬레이터 소스 수정 없이 기존 시험과 결과를 확인한다.

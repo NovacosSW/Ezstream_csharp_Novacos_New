@@ -439,7 +439,7 @@ internal sealed class CoverageTestRunner
         IProgress<string> progress,
         CancellationToken cancellationToken)
         => HarnessCoverageRunner.RunAsync(
-            "STREAM_INFO_FAILURE", "손상 스트림 정보 검색 실패 보고", progress, cancellationToken);
+            "STREAM_INFO_FAILURE", "입력 열기 후 스트림 분석 실패·오류 로그·입력 정리", progress, cancellationToken);
 
     public static Task<TestResult> RunServiceLogLevelTestAsync(
         IProgress<string> progress,

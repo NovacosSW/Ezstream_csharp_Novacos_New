@@ -36,7 +36,7 @@ internal static class Program
                 "FFMPEG_BRANCHES" => HasText(ServiceCoverageScenarios.RunFfmpegBranches()),
                 "MISSING_TIMESTAMP" => RecorderCoverageScenarios.RunMissingTimestamp(),
                 "INVALID_TIMESTAMP" => RunInvalidTimestamp(),
-                "STREAM_INFO_FAILURE" => RunStreamInfoFailure(),
+                "STREAM_INFO_FAILURE" => RecorderStreamInfoFailureScenario.Run(),
                 "SERVICE_LOG_LEVELS" => HasText(ServiceCoverageScenarios.RunServiceLogLevels()),
                 "RESIDUAL_BRANCHES" => HasText(ServiceCoverageScenarios.RunResidualBranches()),
                 "PIPE_ACCEPT_FAILURE" => HasText(ServiceCoverageScenarios.RunPipeAcceptFailure()),
@@ -175,12 +175,6 @@ internal static class Program
             && unknown.StartsWith("FAIL|", StringComparison.Ordinal)
                 ? "OK|빈 명령과 알 수 없는 트레이 명령을 실행했습니다."
                 : "FAIL|트레이 명령 오류 분기를 확인하지 못했습니다.";
-    }
-
-    private static bool RunStreamInfoFailure()
-    {
-        RecorderCoverageScenarios.ReportStreamInfoFailure(NullLogger.Instance);
-        return true;
     }
 
     private static bool RunInvalidTimestamp()

@@ -47,12 +47,6 @@ internal static class RecorderCoverageScenarios
         return negativeAccepted && reversedAccepted;
     }
 
-    public static void ReportStreamInfoFailure(ILogger logger)
-    {
-        ArgumentNullException.ThrowIfNull(logger);
-        CoreLog.CannotFindStreamInfo(logger, "coverage-stream-info", "synthetic malformed stream");
-    }
-
     public static bool RunRetentionZero()
     {
         var missingRoot = Path.Combine(Path.GetTempPath(), "ezstream-retention-zero");
