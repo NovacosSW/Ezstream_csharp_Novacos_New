@@ -1,5 +1,14 @@
 # 조사 맥락
 
+## TC-11 트레일러 오류 반환 검사 구현
+
+- 사용자가 승인한 트레일러 오류 반환 검사를 기존 절단 시험에 추가한다. 실제 파일 종료 후 반환값만 오류로 바꾸며 실제 디스크 장애나 손상 MP4 재현으로 해석하지 않는다. 본 코드는 유지한다.
+- RECORDER_CUT_CONDITIONS에 네 번째 모드를 추가했다. 첫 절단에서 실제 av_write_trailer 성공을 확인한 뒤 AVERROR_EXTERNAL로 반환한다. 바인딩 복원 후 두 번째 세그먼트 종료는 정상 실행한다. 실패 로그 이벤트 37 Warning 1회, 첫 저장 알림 Success=false 및 write_trailer 오류, 두 번째 저장 알림 성공을 검증한다.
+- 양쪽 MP4의 4/1패킷 재읽기, 입출력 컨텍스트 null, 두 파일 배타적 재열기를 확인했다. 첫 파일은 정상 종료 후 반환 오류만 주입했으므로 실제 재생 불가능 파일 검사는 아니다.
+- 추가 후 CA1502/CA1506 분석기 제한에 걸려 저장 결과 검증을 VerifySavedSegments로 분리했다. 최종 `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 동일 옵션 CoverageTool 빌드 성공. 경고/오류 0개.
+- `dotnet-coverage connect <검증 세션 ID> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RECORDER_CUT_CONDITIONS` 통과. 기존 시간 만료·주기 변경·출력 열기 실패와 새 트레일러 오류 네 모드를 함께 실행했다. artifacts/trailer-failure-integration/result.xml에서 CloseOutput 435~438행 모두 covered=yes를 확인했다.
+- 제품 파일 53개 SHA256 불변, git diff --check 통과. TC-11 및 전체 TC-01~19에 포함되지만 전체 UI 시험 자체는 재실행하지 않았다.
+
 ## 출력 트레일러 쓰기 실패 검토
 
 - 사용자 요청은 CloseOutput의 av_write_trailer 음수 반환 블록 검토다. 제품·시뮬레이터 코드는 변경하지 않고 반환 오류와 후속 정리를 확인한다.

@@ -1,4 +1,4 @@
-// 실제 두 비디오 입력과 시험용 바인딩으로 절단 조건과 새 출력 열기 실패를 검증한다.
+// 실제 두 비디오 입력과 시험용 바인딩으로 절단 조건 및 출력 열기·종료 실패를 검증한다.
 using System.Reflection;
 using System.Runtime.InteropServices;
 using EzStream.Core.Config;
@@ -7,6 +7,7 @@ using EzStream.Core.Notifications;
 using EzStream.Core.Recording;
 using EzStream.CoverageTool;
 using FFmpeg.AutoGen;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EzStream.CoverageHarness.Scenarios;
@@ -19,17 +20,22 @@ internal sealed unsafe class RecorderCutCoverageScenario
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int OpenOutput(AVIOContext** context, [MarshalAs(UnmanagedType.LPUTF8Str)] string url, int flags);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int WriteTrailer(AVFormatContext* context);
+
     private readonly ReadFrame _nativeRead;
     private readonly SourceRecorder _recorder;
     private readonly bool _scheduled;
     private readonly OpenOutput _nativeOpen;
+    private readonly WriteTrailer _nativeTrailer;
+    private int _trailers;
     private int _opens;
     private int _reads;
     private string? _firstFile;
     private string? _secondFile;
 
-    private RecorderCutCoverageScenario(ReadFrame nativeRead, OpenOutput nativeOpen, SourceRecorder recorder, bool scheduled)
-        => (_nativeRead, _nativeOpen, _recorder, _scheduled) = (nativeRead, nativeOpen, recorder, scheduled);
+    private RecorderCutCoverageScenario(ReadFrame nativeRead, OpenOutput nativeOpen, WriteTrailer nativeTrailer, SourceRecorder recorder, bool scheduled)
+        => (_nativeRead, _nativeOpen, _nativeTrailer, _recorder, _scheduled) = (nativeRead, nativeOpen, nativeTrailer, recorder, scheduled);
 
     public static string Run()
     {
@@ -45,6 +51,8 @@ internal sealed unsafe class RecorderCutCoverageScenario
                 ?? throw new MissingFieldException("av_read_frame_fptr");
             var openBinding = typeof(ffmpeg).GetField("avio_open_fptr", BindingFlags.Static | BindingFlags.NonPublic)
                 ?? throw new MissingFieldException("avio_open_fptr");
+            var trailerBinding = typeof(ffmpeg).GetField("av_write_trailer_fptr", BindingFlags.Static | BindingFlags.NonPublic)
+                ?? throw new MissingFieldException("av_write_trailer_fptr");
             var library = NativeLibrary.Load(Path.Combine(nativeDirectory, "avformat-58.dll"));
             try
             {
@@ -52,16 +60,26 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     NativeLibrary.GetExport(library, "av_read_frame"));
                 var nativeOpen = Marshal.GetDelegateForFunctionPointer<OpenOutput>(
                     NativeLibrary.GetExport(library, "avio_open"));
-                foreach (var mode in new[] { (Scheduled: false, FailOpen: false), (Scheduled: true, FailOpen: false), (Scheduled: false, FailOpen: true) })
+                var nativeTrailer = Marshal.GetDelegateForFunctionPointer<WriteTrailer>(
+                    NativeLibrary.GetExport(library, "av_write_trailer"));
+                foreach (var mode in new[]
+                {
+                    (Scheduled: false, FailOpen: false, FailTrailer: false),
+                    (Scheduled: true, FailOpen: false, FailTrailer: false),
+                    (Scheduled: false, FailOpen: true, FailTrailer: false),
+                    (Scheduled: false, FailOpen: false, FailTrailer: true),
+                })
                 {
                     var original = binding.GetValue(null);
                     var originalOpen = openBinding.GetValue(null);
+                    var originalTrailer = trailerBinding.GetValue(null);
                     var notices = new List<VideoSaveNotification>();
+                    var logger = new TrailerLogger();
                     var recorder = new SourceRecorder(
-                        new SourceConfig { Url = new Uri(input), Path = mode.FailOpen ? "open-failure" : mode.Scheduled ? "scheduled" : "requested", FilePrefix = "cut" },
+                        new SourceConfig { Url = new Uri(input), Path = mode.FailTrailer ? "trailer-failure" : mode.FailOpen ? "open-failure" : mode.Scheduled ? "scheduled" : "requested", FilePrefix = "cut" },
                         new RecorderConfig { DocumentRoot = root, SegmentMinutes = 1 },
-                        NullLogger.Instance, notices.Add);
-                    var scenario = new RecorderCutCoverageScenario(nativeRead, nativeOpen, recorder, mode.Scheduled);
+                        logger, notices.Add);
+                    var scenario = new RecorderCutCoverageScenario(nativeRead, nativeOpen, nativeTrailer, recorder, mode.Scheduled);
                     try
                     {
                         var method = typeof(RecorderCutCoverageScenario).GetMethod(nameof(ReadControlled),
@@ -72,6 +90,12 @@ internal sealed unsafe class RecorderCutCoverageScenario
                             var openMethod = typeof(RecorderCutCoverageScenario).GetMethod(nameof(OpenControlled),
                                 BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(nameof(OpenControlled));
                             openBinding.SetValue(null, Delegate.CreateDelegate(openBinding.FieldType, scenario, openMethod));
+                        }
+                        if (mode.FailTrailer)
+                        {
+                            var trailerMethod = typeof(RecorderCutCoverageScenario).GetMethod(nameof(TrailerControlled),
+                                BindingFlags.Instance | BindingFlags.NonPublic) ?? throw new MissingMethodException(nameof(TrailerControlled));
+                            trailerBinding.SetValue(null, Delegate.CreateDelegate(trailerBinding.FieldType, scenario, trailerMethod));
                         }
                         SetField(recorder, "_running", true);
                         Invoke(recorder, "RunOnce");
@@ -93,31 +117,65 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     {
                         binding.SetValue(null, original);
                         if (mode.FailOpen) openBinding.SetValue(null, originalOpen);
+                        if (mode.FailTrailer) trailerBinding.SetValue(null, originalTrailer);
                         recorder.Stop();
                         try { Invoke(recorder, "CloseOutput", true); }
                         finally { Invoke(recorder, "CloseInput"); }
                     }
                     Require(ReferenceEquals(binding.GetValue(null), original), "읽기 바인딩 복원 실패");
-                    Require(notices.Count == 2 && notices[0].Success && notices[0].FileSizeBytes > 0
-                        && CountPackets(scenario._firstFile!) == 4, "이전 MP4의 정상 저장을 확인하지 못했습니다.");
+                    if (mode.FailTrailer)
+                        Require(ReferenceEquals(trailerBinding.GetValue(null), originalTrailer), "트레일러 바인딩 복원 실패");
                     if (mode.FailOpen)
-                    {
                         Require(ReferenceEquals(openBinding.GetValue(null), originalOpen), "출력 열기 바인딩 복원 실패");
-                        Require(!notices[1].Success && notices[1].FileSizeBytes == 0
-                            && notices[1].Error?.StartsWith("avio_open:", StringComparison.Ordinal) == true,
-                            "새 출력 열기 실패 알림이 예상과 다릅니다.");
-                    }
-                    else
-                    {
-                        Require(notices[1].Success && notices[1].FileSizeBytes > 0 && CountPackets(scenario._secondFile!) == 1,
-                            "새 MP4의 정상 저장을 확인하지 못했습니다.");
-                    }
+                    scenario.VerifySavedSegments(notices, logger, mode.FailOpen, mode.FailTrailer);
                 }
             }
             finally { NativeLibrary.Free(library); }
-            return "절단 조건 및 새 출력 열기 실패 후 패킷 처리 중단 확인";
+            return "절단 조건·출력 열기 실패·트레일러 오류 보고와 정리 확인";
         }
         finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private void VerifySavedSegments(List<VideoSaveNotification> notices, TrailerLogger logger, bool failOpen, bool failTrailer)
+    {
+        Require(notices.Count == 2 && notices[0].Success == !failTrailer && notices[0].FileSizeBytes > 0
+            && CountPackets(_firstFile!) == 4, "이전 MP4의 정상 저장을 확인하지 못했습니다.");
+        if (failTrailer)
+        {
+            var error = FfmpegLoader.ErrorString(ffmpeg.AVERROR_EXTERNAL);
+            Require(_trailers == 1 && notices[0].Error == "write_trailer: " + error
+                && logger.Count == 1 && logger.Message?.Contains(error, StringComparison.Ordinal) == true,
+                "트레일러 오류 로그와 실패 알림을 확인하지 못했습니다.");
+            foreach (var fieldName in new[] { "_ic", "_oc" })
+            {
+                var field = typeof(SourceRecorder).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?? throw new MissingFieldException(fieldName);
+                Require(Pointer.Unbox(field.GetValue(_recorder)!) == null, "종료 후 컨텍스트가 남았습니다.");
+            }
+            using var unlockedFirst = new FileStream(_firstFile!, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            using var unlockedSecond = new FileStream(_secondFile!, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        }
+        if (failOpen)
+        {
+            Require(!notices[1].Success && notices[1].FileSizeBytes == 0
+                && notices[1].Error?.StartsWith("avio_open:", StringComparison.Ordinal) == true,
+                "새 출력 열기 실패 알림이 예상과 다릅니다.");
+        }
+        else
+        {
+            Require(notices[1].Success && notices[1].FileSizeBytes > 0 && CountPackets(_secondFile!) == 1,
+                "새 MP4의 정상 저장을 확인하지 못했습니다.");
+        }
+    }
+
+    private int TrailerControlled(AVFormatContext* context)
+    {
+        Require(context != null && context->pb != null && _recorder.Snapshot().RecordedBytes > 0,
+            "실제 패킷 기록 후 트레일러에 도달하지 못했습니다.");
+        var result = _nativeTrailer(context);
+        Require(result >= 0, "오류 주입 전 실제 트레일러 종료가 실패했습니다.");
+        _trailers++;
+        return ffmpeg.AVERROR_EXTERNAL;
     }
 
     private int OpenControlled(AVIOContext** context, string url, int flags)
@@ -190,5 +248,22 @@ internal sealed unsafe class RecorderCutCoverageScenario
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
+    }
+
+    private sealed class TrailerLogger : ILogger
+    {
+        public int Count { get; private set; }
+        public string? Message { get; private set; }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (eventId.Id == 37 && logLevel == LogLevel.Warning)
+            {
+                Count++;
+                Message = formatter(state, exception);
+            }
+        }
     }
 }
