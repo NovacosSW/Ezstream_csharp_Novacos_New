@@ -1,5 +1,13 @@
 # 조사 맥락
 
+## TC-11 트레일러 관리 예외 검사 구현
+
+- 사용자 승인에 따라 기존 TC-11에 관리 바인딩 예외 모드를 추가한다. 실제 네이티브 종료 성공 후 일반 예외를 던지며 제품 코드나 제외 예외 3종의 실제 장애는 건드리지 않는다.
+- RecorderCutCoverageScenario에 다섯 번째 모드를 추가했다. 첫 네이티브 트레일러 성공 후 시험용 InvalidOperationException을 던지고 이벤트 35 Warning에 동일 예외 객체가 전달되는지, 저장 실패 알림에 메시지가 담기는지 확인한다. 바인딩 복원 후 두 번째 저장 성공, MP4 4+1 패킷 재읽기, 두 파일 독점 열기, 입력/출력 컨텍스트 null도 검증한다.
+- 검증 명령 `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool의 동일 빌드가 각각 경고 0·오류 0으로 통과했다.
+- `dotnet-coverage connect <session> tools/EzStream.CoverageHarness/bin/Debug/net9.0-windows/win-x64/EzStream.CoverageHarness.exe RECORDER_CUT_CONDITIONS`가 OK를 반환했다. 기존 4개 모드와 새 관리 예외 모드를 함께 실행했다. `artifacts/trailer-exception-integration/result.xml`에서 오류 반환 435~438행과 catch 본문 442~445행 모두 covered=yes를 확인했다. 예외 필터의 제외 형식별 분기를 모두 검증한 것은 아니다.
+- 제품 소스·DLL·PDB 53개 SHA256 비교가 모두 동일했고 `git diff --check`도 통과했다. TC-11에 연결했으며 전체 UI 시험 버튼 자체는 이번에 실행하지 않았다. 실제 네이티브 장애 발생 확률이나 손상 파일 재현을 증명하는 시험은 아니다.
+
 ## 트레일러 관리 예외 catch 검토
 
 - 사용자 요청은 WriteTrailerFailed를 호출하는 관리 예외 catch 검토다. 제품 및 시뮬레이터 코드는 변경하지 않는다.

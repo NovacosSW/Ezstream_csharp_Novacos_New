@@ -28,6 +28,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
     private readonly bool _scheduled;
     private readonly OpenOutput _nativeOpen;
     private readonly WriteTrailer _nativeTrailer;
+    private InvalidOperationException? _trailerException;
     private int _trailers;
     private int _opens;
     private int _reads;
@@ -64,10 +65,11 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     NativeLibrary.GetExport(library, "av_write_trailer"));
                 foreach (var mode in new[]
                 {
-                    (Scheduled: false, FailOpen: false, FailTrailer: false),
-                    (Scheduled: true, FailOpen: false, FailTrailer: false),
-                    (Scheduled: false, FailOpen: true, FailTrailer: false),
-                    (Scheduled: false, FailOpen: false, FailTrailer: true),
+                    (Scheduled: false, FailOpen: false, FailTrailer: false, ThrowTrailer: false, Path: "requested"),
+                    (Scheduled: true, FailOpen: false, FailTrailer: false, ThrowTrailer: false, Path: "scheduled"),
+                    (Scheduled: false, FailOpen: true, FailTrailer: false, ThrowTrailer: false, Path: "open-failure"),
+                    (Scheduled: false, FailOpen: false, FailTrailer: true, ThrowTrailer: false, Path: "trailer-failure"),
+                    (Scheduled: false, FailOpen: false, FailTrailer: true, ThrowTrailer: true, Path: "trailer-exception"),
                 })
                 {
                     var original = binding.GetValue(null);
@@ -76,10 +78,12 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     var notices = new List<VideoSaveNotification>();
                     var logger = new TrailerLogger();
                     var recorder = new SourceRecorder(
-                        new SourceConfig { Url = new Uri(input), Path = mode.FailTrailer ? "trailer-failure" : mode.FailOpen ? "open-failure" : mode.Scheduled ? "scheduled" : "requested", FilePrefix = "cut" },
+                        new SourceConfig { Url = new Uri(input), Path = mode.Path, FilePrefix = "cut" },
                         new RecorderConfig { DocumentRoot = root, SegmentMinutes = 1 },
                         logger, notices.Add);
                     var scenario = new RecorderCutCoverageScenario(nativeRead, nativeOpen, nativeTrailer, recorder, mode.Scheduled);
+                    if (mode.ThrowTrailer)
+                        scenario._trailerException = new InvalidOperationException("coverage-trailer-managed-exception");
                     try
                     {
                         var method = typeof(RecorderCutCoverageScenario).GetMethod(nameof(ReadControlled),
@@ -131,7 +135,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
                 }
             }
             finally { NativeLibrary.Free(library); }
-            return "절단 조건·출력 열기 실패·트레일러 오류 보고와 정리 확인";
+            return "절단 조건·출력 열기 실패·트레일러 오류 반환 및 관리 예외 보고와 정리 확인";
         }
         finally { Directory.Delete(root, recursive: true); }
     }
@@ -142,10 +146,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
             && CountPackets(_firstFile!) == 4, "이전 MP4의 정상 저장을 확인하지 못했습니다.");
         if (failTrailer)
         {
-            var error = FfmpegLoader.ErrorString(ffmpeg.AVERROR_EXTERNAL);
-            Require(_trailers == 1 && notices[0].Error == "write_trailer: " + error
-                && logger.Count == 1 && logger.Message?.Contains(error, StringComparison.Ordinal) == true,
-                "트레일러 오류 로그와 실패 알림을 확인하지 못했습니다.");
+            VerifyTrailerFailure(notices[0], logger);
             foreach (var fieldName in new[] { "_ic", "_oc" })
             {
                 var field = typeof(SourceRecorder).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
@@ -168,6 +169,25 @@ internal sealed unsafe class RecorderCutCoverageScenario
         }
     }
 
+    private void VerifyTrailerFailure(VideoSaveNotification notice, TrailerLogger logger)
+    {
+        var error = _trailerException?.Message ?? FfmpegLoader.ErrorString(ffmpeg.AVERROR_EXTERNAL);
+        Require(_trailers == 1 && notice.Error == "write_trailer: " + error,
+            "트레일러 실패 알림을 확인하지 못했습니다.");
+        if (_trailerException is not null)
+        {
+            Require(logger.ExceptionCount == 1 && logger.Count == 0
+                && ReferenceEquals(logger.Exception, _trailerException),
+                "트레일러 관리 예외 로그를 확인하지 못했습니다.");
+        }
+        else
+        {
+            Require(logger.Count == 1 && logger.ExceptionCount == 0
+                && logger.Message?.Contains(error, StringComparison.Ordinal) == true,
+                "트레일러 오류 반환 로그를 확인하지 못했습니다.");
+        }
+    }
+
     private int TrailerControlled(AVFormatContext* context)
     {
         Require(context != null && context->pb != null && _recorder.Snapshot().RecordedBytes > 0,
@@ -175,6 +195,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
         var result = _nativeTrailer(context);
         Require(result >= 0, "오류 주입 전 실제 트레일러 종료가 실패했습니다.");
         _trailers++;
+        if (_trailerException is not null) throw _trailerException;
         return ffmpeg.AVERROR_EXTERNAL;
     }
 
@@ -254,6 +275,8 @@ internal sealed unsafe class RecorderCutCoverageScenario
     {
         public int Count { get; private set; }
         public string? Message { get; private set; }
+        public int ExceptionCount { get; private set; }
+        public Exception? Exception { get; private set; }
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
@@ -263,6 +286,11 @@ internal sealed unsafe class RecorderCutCoverageScenario
             {
                 Count++;
                 Message = formatter(state, exception);
+            }
+            if (eventId.Id == 35 && logLevel == LogLevel.Warning)
+            {
+                ExceptionCount++;
+                Exception = exception;
             }
         }
     }
