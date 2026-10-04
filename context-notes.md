@@ -1,5 +1,20 @@
 # 조사 맥락
 
+## Program Build/Run 검토
+
+- 결과.xml의 Program.cs SHA256 `408DC3428961243E407262D9D3EE2830B45C3C921DFD40DD9B54D96A126A07FD`가 현재 소스와 일치한다. XML 파싱 및 Get-FileHash로 확인했다.
+- 25행 builder.Build()는 covered=yes, 26행 host.Run()은 covered=partial이다. Main은 블록 31/32, 줄 92.86%다. Build 실패를 재현해야 한다는 뜻이 아니다.
+- .NET v9.0.0 HostingAbstractionsHostExtensions 구현에서 Run은 RunAsync를 동기 대기한다. RunAsync는 StartAsync, WaitForShutdownAsync를 수행하고 finally에서 Host를 Dispose한다. 정상 종료는 StopApplication 또는 수명주기의 종료 신호를 통해 대기를 해제하고 StopAsync 및 반환까지 이어진다.
+- ProductSessionLauncher.StopExistingProductAsync 225행은 Process.Kill(entireProcessTree:true)를 사용한다. 정상 종료 제어 흐름을 실행하지 않는다. RunServiceWithoutConsoleForCoverageAsync 역시 이 종료 함수를 사용한다.
+- RunServiceLifecycle은 Worker/Engine/Pipe를 직접 구성하고 Worker.StopAsync를 호출하며 Program의 실제 host.Run을 실행하지 않는다. 따라서 해당 테스트를 실행해도 Program의 정상 반환 검증을 대체하지 못한다.
+- 정상 종료 반환 경로 누락이 부분 달성의 유력 원인이다. XML에 IL 블록 오프셋이 없어 정확히 어떤 숨은 반환/정리 블록인지 단정하지 않는다. Program의 using var fileLoggerProvider 정리 코드도 정상 반환과 관련된다.
+- 정상 종료는 실제 운영 가능한 필수 경로이므로 제외 근거가 없다. 실제 서비스로 수집 중이면 SCM Stop을, 콘솔 프로세스면 대상 콘솔의 Ctrl+C를 사용하고 실제 프로세스 정상 종료 후 수집 결과를 비교해야 한다. Harness가 실제 엔트리포인트를 실행하면서 Host를 관찰하고 IHostApplicationLifetime.StopApplication을 요청하는 방법도 가능하지만 구현 및 별도 검증이 필요하다.
+- --console은 이 소스에서 콘솔 로거 추가 여부만 바꾼다. AddWindowsService는 실제 Windows Service 실행 문맥에서만 WindowsServiceLifetime을 등록한다. 옵션을 생략해 EXE를 직접 실행하는 것은 SCM 서비스 종료 시험과 같지 않다.
+- 제품 코드 및 시뮬레이터는 이번 검토에서 수정하지 않았고 서비스 실행/종료 재현도 하지 않았다. 읽기 전용 소스·XML 검사 및 공식 .NET 9 구현 대조를 수행했다.
+- 공식 근거.
+  - https://github.com/dotnet/runtime/blob/v9.0.0/src/libraries/Microsoft.Extensions.Hosting.Abstractions/src/HostingAbstractionsHostExtensions.cs
+  - https://github.com/dotnet/runtime/blob/v9.0.0/src/libraries/Microsoft.Extensions.Hosting.WindowsServices/src/WindowsServiceLifetimeHostBuilderExtensions.cs
+
 - 요청은 시뮬레이터에서 Tray/Service 대비 Core 동적 검사 결과가 적은 이유 조사이다.
 - 시작 시 `EzStream.sln`에 사용자 변경이 있어 수정하지 않는다.
 - Core는 독립 실행 프로그램이 아닌 라이브러리이며 Harness는 Core/Service/Tray를 모두 참조한다.
