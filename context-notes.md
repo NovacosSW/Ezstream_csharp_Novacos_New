@@ -1,5 +1,13 @@
 # 조사 맥락
 
+## TC-15 기준 타임스탬프 선택 시험 구현
+
+- 사용자 승인에 따라 기존 INVALID_TIMESTAMP 시나리오에 기준 시각 선택 검증을 추가한다. FfmpegLoader 초기화 후 실제 PreparePacketForOutput을 호출하며 제품 코드는 수정하지 않는다.
+- PTS 단독 1000, DTS 단독 1000, PTS=1200/DTS=1000 세 입력을 1/1000 time_base로 시험한다. 세그먼트 기준 1000000μs, 기대 PTS/DTS, NOPTS 유지, true 반환, 출력 stream_index=2·pos=-1을 확인한다. 포인터 수정 추적 한계로 CA1508이 발생한 출력 위치 비교는 값 전달 검증 함수로 분리해 경고 억제 없이 해결했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool 동일 빌드 모두 경고 0·오류 0으로 통과했다.
+- `dotnet-coverage connect <session> <Harness.exe> INVALID_TIMESTAMP`와 `MISSING_TIMESTAMP` 모두 OK. `artifacts/timestamp-reference-integration/result.xml`의 PreparePacketForOutput 547행 covered=yes 확인. 제품 파일 53개 SHA256 불변, 제품/Harness DLL·PDB 6쌍 일치, git diff --check 통과.
+- 기존 TC-15에 연결되어 전체 UI 시험에 포함된다. 전체 UI 버튼 자체는 실행하지 않았으며 기존 Results 및 루트 결과.xml은 덮어쓰지 않았다. 이번 시험은 타임스탬프 준비 함수 검증으로 PTS 단독 입력의 실제 muxer 저장 성공까지 보장하는 시험은 아니다.
+
 ## 기준 타임스탬프 삼항 연산 검토
 
 - 최신 tray-presence-check/service.xml에서 PreparePacketForOutput 547행 partial 확인. 행 단위 XML은 어느 피연산자가 미실행인지 직접 지정하지 않지만, 기존 TC-15는 둘 다 없는 패킷 또는 둘 다 있는 음수/역전 패킷만 구성하며 PTS만 있는 시험은 없다. DTS 정상 경로와 앞선 누락 return 실행을 종합하면 DTS 없음·PTS 있음 대체 경로가 빠진 것으로 판단한다.

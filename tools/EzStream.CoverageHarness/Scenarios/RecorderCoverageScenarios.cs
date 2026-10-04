@@ -45,8 +45,33 @@ internal static class RecorderCoverageScenarios
         var reversed = new AVPacket { pts = 5, dts = 10 };
         var reversedAccepted = SourceRecorder.PreparePacketForOutput(
             &reversed, timeBase, timeBase, 0, ref segmentStart);
-        return negativeAccepted && reversedAccepted;
+        return negativeAccepted && reversedAccepted && RunTimestampReferenceSelection();
     }
+
+    private static unsafe bool RunTimestampReferenceSelection()
+    {
+        var timeBase = new AVRational { num = 1, den = 1000 };
+        foreach (var test in new[]
+        {
+            (Pts: 1000L, Dts: ffmpeg.AV_NOPTS_VALUE, ExpectedPts: 0L, ExpectedDts: ffmpeg.AV_NOPTS_VALUE),
+            (Pts: ffmpeg.AV_NOPTS_VALUE, Dts: 1000L, ExpectedPts: ffmpeg.AV_NOPTS_VALUE, ExpectedDts: 0L),
+            (Pts: 1200L, Dts: 1000L, ExpectedPts: 200L, ExpectedDts: 0L),
+        })
+        {
+            var segmentStart = ffmpeg.AV_NOPTS_VALUE;
+            var packet = new AVPacket { pts = test.Pts, dts = test.Dts, stream_index = 0, pos = 123 };
+            var accepted = SourceRecorder.PreparePacketForOutput(
+                &packet, timeBase, timeBase, 2, ref segmentStart);
+            if (!accepted || segmentStart != 1_000_000L
+                || packet.pts != test.ExpectedPts || packet.dts != test.ExpectedDts
+                || !HasOutputPacketLocation(packet))
+                throw new InvalidOperationException("PTS 단독·DTS 단독·DTS 우선 기준 시각 선택 검증 실패");
+        }
+        return true;
+    }
+
+    private static bool HasOutputPacketLocation(AVPacket packet)
+        => packet.stream_index == 2 && packet.pos == -1;
 
     public static bool RunRetentionZero()
     {
