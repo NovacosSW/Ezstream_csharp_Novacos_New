@@ -1,5 +1,13 @@
 # 조사 맥락
 
+## TC-11 IO 닫기 오류 시험 구현
+
+- 사용자 승인에 따라 기존 절단 시나리오의 요청 절단·트레일러 오류 두 모드를 재사용해 닫기 실패를 주입한다. native avio_closep 성공 및 포인터 null을 확인한 뒤 첫 호출만 AVERROR_INVALIDDATA로 반환한다. 트레일러 오류 AVERROR_EXTERNAL과 구분해 기존 오류 보존을 검증한다. 본 코드는 변경하지 않는다.
+- RecorderCloseFailureInjection으로 실제 IO 해제 및 두 번째 닫기 성공을 확인하고 Dispose에서 바인딩을 복원한다. 닫기 단독 실패는 avio_close 알림, 트레일러 동시 실패는 write_trailer 알림을 검증한다. 기존 시나리오가 MP4 재읽기 4+1패킷, 첫 실패/둘째 성공 알림, 컨텍스트 null, 파일 독점 열기를 함께 확인한다. TC-11 별도 RECORDER_CLOSE_FAILURE 단계로 연결했다.
+- `dotnet build tools/EzStream.CoverageHarness/EzStream.CoverageHarness.csproj -c Debug --no-restore -p:BuildProjectReferences=false -p:CopyRetryCount=0` 및 CoverageTool 동일 빌드 모두 경고 0·오류 0으로 통과했다.
+- 새 세션의 `dotnet-coverage connect <session> <Harness.exe> RECORDER_CLOSE_FAILURE`, `RECORDER_CUT_CONDITIONS`, `RECORDER_WRITE_FAILURE` 모두 OK. `artifacts/close-failure-integration/result.xml`의 CloseOutput 450행과 451행 모두 covered=yes 확인. 제품 파일 53개 해시 불변, 제품/Harness DLL·PDB 6쌍 일치, git diff --check 통과.
+- 전체 UI 시험에 포함되는 TC-11에 연결했지만 전체 UI 버튼 자체는 이번에 실행하지 않았다. 기존 Results/결과.xml은 유지하며 새 회차 실행 시 반영된다. 실제 디스크 고장 재현이 아닌 닫기 실패 반환 처리 시험이다.
+
 ## TC-15 음수·역전 보정 결과 검증 강화
 
 - 사용자 승인에 따라 시뮬레이터 TC-15의 반환값 전용 검사를 최종 PTS/DTS 검증으로 교체한다. 제품 코드는 유지하고 새로운 독립 수집 결과로 확인한다.

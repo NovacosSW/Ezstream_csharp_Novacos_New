@@ -30,6 +30,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
     private readonly WriteTrailer _nativeTrailer;
     private InvalidOperationException? _trailerException;
     private RecorderWriteFailureInjection? _writeFailure;
+    private RecorderCloseFailureInjection? _closeFailure;
     private int _trailers;
     private int _opens;
     private int _reads;
@@ -39,7 +40,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
     private RecorderCutCoverageScenario(ReadFrame nativeRead, OpenOutput nativeOpen, WriteTrailer nativeTrailer, SourceRecorder recorder, bool scheduled)
         => (_nativeRead, _nativeOpen, _nativeTrailer, _recorder, _scheduled) = (nativeRead, nativeOpen, nativeTrailer, recorder, scheduled);
 
-    public static string Run(bool failWrite = false)
+    public static string Run(bool failWrite = false, bool failClose = false)
     {
         var root = Path.Combine(Path.GetTempPath(), "ezstream-cut-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -71,7 +72,7 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     (Scheduled: false, FailOpen: true, FailTrailer: false, ThrowTrailer: false, Path: "open-failure"),
                     (Scheduled: false, FailOpen: false, FailTrailer: true, ThrowTrailer: false, Path: "trailer-failure"),
                     (Scheduled: false, FailOpen: false, FailTrailer: true, ThrowTrailer: true, Path: "trailer-exception"),
-                }.Take(failWrite ? 1 : 5))
+                }.Take(failWrite ? 1 : 5).Where(mode => !failClose || mode.Path is "requested" or "trailer-failure"))
                 {
                     var original = binding.GetValue(null);
                     var originalOpen = openBinding.GetValue(null);
@@ -85,6 +86,8 @@ internal sealed unsafe class RecorderCutCoverageScenario
                     var scenario = new RecorderCutCoverageScenario(nativeRead, nativeOpen, nativeTrailer, recorder, mode.Scheduled);
                     using var writeFailure = failWrite ? new RecorderWriteFailureInjection(recorder, library) : null;
                     scenario._writeFailure = writeFailure;
+                    using var closeFailure = failClose ? new RecorderCloseFailureInjection(library) : null;
+                    scenario._closeFailure = closeFailure;
                     if (mode.ThrowTrailer)
                         scenario._trailerException = new InvalidOperationException("coverage-trailer-managed-exception");
                     try
@@ -145,11 +148,12 @@ internal sealed unsafe class RecorderCutCoverageScenario
 
     private void VerifySavedSegments(List<VideoSaveNotification> notices, TrailerLogger logger, bool failOpen, bool failTrailer)
     {
-        var failed = failTrailer || _writeFailure is not null;
+        var failed = failTrailer || _writeFailure is not null || _closeFailure is not null;
         Require(notices.Count == 2 && notices[0].Success == !failed && notices[0].FileSizeBytes > 0
             && CountPackets(_firstFile!) == (_writeFailure is null ? 4 : 2), "이전 MP4의 저장 결과를 확인하지 못했습니다.");
         if (failTrailer) VerifyTrailerFailure(notices[0], logger);
         if (_writeFailure is not null) VerifyWriteFailure(notices[0], logger);
+        _closeFailure?.VerifyCompleted(notices[0], failTrailer);
         if (failed)
         {
             foreach (var fieldName in new[] { "_ic", "_oc" })

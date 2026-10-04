@@ -52,6 +52,7 @@ internal static class Program
                 "RECORDER_EAGAIN" => HasText(RecorderEagainCoverageScenario.Run()),
                 "RECORDER_CUT_CONDITIONS" => HasText(RecorderCutCoverageScenario.Run()),
                 "RECORDER_WRITE_FAILURE" => HasText(RecorderCutCoverageScenario.Run(failWrite: true)),
+                "RECORDER_CLOSE_FAILURE" => HasText(RecorderCutCoverageScenario.Run(failClose: true)),
                 "RECORDER_FILE_INFO_RACE" => RecorderFileInfoCoverageScenario.Run(),
                 "SAME_SEGMENT_INTERVAL" => RecorderCoverageScenarios.RunSameSegmentInterval(),
                 "UNSUPPORTED_CODEC_HEADER" => RecorderCoverageScenarios.RunUnsupportedCodecHeader(),
