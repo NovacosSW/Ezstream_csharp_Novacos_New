@@ -194,6 +194,33 @@ internal static class RecorderCoverageScenarios
         }
     }
 
+    public static bool RunRtspTcpInputFailure()
+    {
+        FfmpegLoader.Initialize(
+            Path.Combine(AppContext.BaseDirectory, "ffmpeg"),
+            "warning",
+            NullLogger.Instance);
+        var recorder = new SourceRecorder(
+            new SourceConfig
+            {
+                Url = new Uri("rtsp://127.0.0.1:1/coverage"),
+                Path = "coverage-rtsp-tcp",
+                FilePrefix = "coverage_rtsp_tcp",
+            },
+            new RecorderConfig(),
+            NullLogger.Instance);
+        try
+        {
+            InvokeRecorder(recorder, "RunOnce");
+            return recorder.Snapshot().LastError?.Contains(
+                "open_input", StringComparison.OrdinalIgnoreCase) == true;
+        }
+        finally
+        {
+            InvokeRecorder(recorder, "CloseInput");
+        }
+    }
+
     public static bool RunUnsupportedCodecHeader()
     {
         var root = Path.Combine(

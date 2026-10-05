@@ -187,6 +187,8 @@ internal static class ServiceCoverageScenarios
             throw new InvalidOperationException("녹화기 최상위 예외 복구 분기를 확인하지 못했습니다.");
         if (!RecorderCoverageScenarios.RunRtspUdpInputFailure())
             throw new InvalidOperationException("RTSP UDP 입력 실패 분기를 확인하지 못했습니다.");
+        if (!RecorderCoverageScenarios.RunRtspTcpInputFailure())
+            throw new InvalidOperationException("RTSP TCP 입력 실패 분기를 확인하지 못했습니다.");
         ExerciseRetentionFailure(logger);
         ExerciseRetentionDirectoryFailure(logger);
         ExerciseUdpEndpointBranches(logger);

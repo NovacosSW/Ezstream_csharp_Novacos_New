@@ -166,7 +166,7 @@ internal static class Program
             static _ => Application.Exit(),
             null,
             TimeSpan.FromMilliseconds(500),
-            Timeout.InfiniteTimeSpan);
+            TimeSpan.FromMilliseconds(500)); // 메시지 루프 시작 전 호출이 유실되지 않도록 반복
         InvokeStatic(typeof(EzStream.Tray.Program), "Main");
         return WriteResult(true, "Tray Program.Main 정상 반환 완료");
     }
